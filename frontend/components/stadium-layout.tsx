@@ -41,6 +41,12 @@ import { useSeatWrites } from "@/hooks/use-seat-writes";
 import { normalizeEvmError } from "@/lib/evm-errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { STADIUM_CONTRACT } from "@/lib/contract-config";
+import { usePublicClient } from "wagmi";
+
+const TX_EXPLORER_BASE_URL =
+  process.env.NEXT_PUBLIC_TX_EXPLORER_BASE_URL ??
+  "https://wirefluidscan.com/tx";
 
 type SectionId =
   | "north"
@@ -125,6 +131,45 @@ const SECTION_CONFIGS: {
   },
 ];
 
+const CONTRACT_SECTION_BY_STAND: Record<SectionId, 1 | 2 | 3> = {
+  north: 1,
+  "north-east": 1,
+  "south-east": 2,
+  south: 2,
+  "south-west": 3,
+  "north-west": 3,
+};
+
+function rowLabelToContractRow(rowLabel: string): number {
+  const normalized = rowLabel.trim().toUpperCase();
+  let value = 0;
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    const charCode = normalized.charCodeAt(index);
+    if (charCode < 65 || charCode > 90) {
+      return 0;
+    }
+    value = value * 26 + (charCode - 64);
+  }
+
+  return Math.max(value - 1, 0);
+}
+
+function seatNumberToContractSeat(seatNumber: number): number {
+  return Math.max(seatNumber - 1, 0);
+}
+
+function getContractSectionId(sectionId?: string, sectionName?: string): 1 | 2 | 3 {
+  const standId = sectionId && sectionId in CONTRACT_SECTION_BY_STAND
+    ? (sectionId as SectionId)
+    : sectionName
+      ? (SECTION_CONFIGS.find((section) => section.name === sectionName)?.id ?? "north")
+      : "north";
+
+  return CONTRACT_SECTION_BY_STAND[standId];
+}
+
+
 function getRingSegmentPath(
   cx: number,
   cy: number,
@@ -153,6 +198,7 @@ export default function StadiumLayout() {
   const { isConnected, address } = useConnection();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const publicClient = usePublicClient();
 
   const { selectedSeats, addSeat, removeSeat, clearCart } = useSelectedSeats();
   const selectedSeatIds = useMemo(
@@ -174,6 +220,7 @@ export default function StadiumLayout() {
   );
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrIssuedAt, setQrIssuedAt] = useState<number | null>(null);
+  const [confirmedSeats, setConfirmedSeats] = useState<typeof selectedSeats>([]);
   const [hydrated, setHydrated] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
@@ -336,6 +383,9 @@ export default function StadiumLayout() {
             txHash: hash,
             walletAddress: walletAddress,
           });
+          setConfirmedSeats(selectedSeats);
+          setQrIssuedAt(Date.now());
+          setShowQRModal(true);
           toast.success("Ticket purchased successfully!", {
             id: processingToast,
           });
@@ -455,52 +505,123 @@ export default function StadiumLayout() {
       return;
     }
     setTxError(null);
+    setShowQRModal(false);
+    setConfirmedSeats([]);
     try {
-      const sectionMapping: Record<string, number> = {
-        north: 1,
-        "north-east": 2,
-        "south-east": 3,
-        south: 4,
-        "south-west": 5,
-        "north-west": 6,
-        NORTH: 1,
-        "N-E": 2,
-        "S-E": 3,
-        SOUTH: 4,
-        "S-W": 5,
-        "N-W": 6,
-      };
+      const contractSeats = selectedSeats.map((seat) => ({
+        section: getContractSectionId(seat.sectionId, seat.sectionName),
+        row: rowLabelToContractRow(seat.rowLabel),
+        seatNumber: seatNumberToContractSeat(seat.number),
+      }));
 
-      const totalValue = selectedSeats.reduce((acc, s) => {
-        const val = Math.floor((s.priceEth || 0) * 1e18);
-        return acc + BigInt(isNaN(val) ? 0 : val);
-      }, BigInt(0));
+      const chainSeatStates = publicClient
+        ? await Promise.all(
+            contractSeats.map((seat) =>
+              publicClient.readContract({
+                ...STADIUM_CONTRACT,
+                functionName: "getSeatByIndex",
+                args: [
+                  BigInt(1),
+                  BigInt(seat.section),
+                  BigInt(seat.row),
+                  BigInt(seat.seatNumber),
+                ],
+              }),
+            ),
+          )
+        : [];
 
-      const params = selectedSeats.map((s) => {
-        const sectionId =
-          sectionMapping[s.sectionId] || sectionMapping[s.sectionName] || 1;
-        const rowNum = parseInt(s.rowLabel);
-        return {
-          eventId: 1,
-          section: sectionId,
-          row: isNaN(rowNum) ? 1 : rowNum,
-          seatNumber: s.number || 0,
-        };
-      });
+      const onChainPrices = publicClient
+        ? await Promise.all(
+            contractSeats.map((seat, index) => {
+              const seatState = chainSeatStates[index] as
+                | { price?: bigint; isReserved?: boolean }
+                | readonly unknown[];
+
+              const seatPrice =
+                typeof seatState === "object" && seatState !== null && "price" in seatState
+                  ? BigInt((seatState as { price: bigint }).price)
+                  : BigInt((seatState as readonly unknown[])[4] as bigint);
+
+              if (seatPrice > BigInt(0)) {
+                return Promise.resolve(seatPrice);
+              }
+
+              return publicClient.readContract({
+                ...STADIUM_CONTRACT,
+                functionName: "basePrices",
+                args: [BigInt(1), BigInt(seat.section)],
+              });
+            }),
+          )
+        : [];
+
+      if (publicClient) {
+        const reservedSeat = chainSeatStates.map((seatState) => {
+          if (typeof seatState === "object" && seatState !== null && "isReserved" in seatState) {
+            return Boolean((seatState as { isReserved?: boolean }).isReserved);
+          }
+          return Boolean((seatState as readonly unknown[])[6] as boolean);
+        });
+
+        if (reservedSeat.some(Boolean)) {
+          toast.error("One or more selected seats are already reserved on-chain. Pick a different seat.");
+          return;
+        }
+
+        if (onChainPrices.some((price) => BigInt(price as bigint) <= BigInt(0))) {
+          toast.error("One or more selected seats are not for sale on-chain.");
+          return;
+        }
+      }
+
+      const totalValue = onChainPrices.reduce(
+        (acc, price) => acc + BigInt(price as bigint),
+        BigInt(0),
+      );
+
+      const params = contractSeats.map((seat) => ({
+        eventId: 1,
+        section: seat.section,
+        row: seat.row,
+        seatNumber: seat.seatNumber,
+      }));
 
       if (selectedSeats.length === 1)
         await writes.reserveSingle(params[0], totalValue);
       else await writes.reserveBatch(params, totalValue);
-      setQrIssuedAt(Date.now());
-      setShowQRModal(true);
     } catch (err) {
       setTxError(normalizeEvmError(err));
     }
   };
 
-  const availableCount = activeSection?.counts?.available ?? 0;
+  const dashboardCounts = useMemo(() => {
+    if (activeSection) {
+      if (sectionSeats.length > 0) {
+        return sectionSeats.reduce(
+          (counts, seat) => {
+            counts[seat.status] += 1;
+            return counts;
+          },
+          { available: 0, locked: 0, sold: 0 },
+        );
+      }
+
+      return activeSection.counts;
+    }
+
+    return sections.reduce(
+      (counts, section) => {
+        counts.available += section.counts.available;
+        counts.locked += section.counts.locked;
+        counts.sold += section.counts.sold;
+        return counts;
+      },
+      { available: 0, locked: 0, sold: 0 },
+    );
+  }, [activeSection, sectionSeats, sections]);
   const activeRows = useMemo(() => {
-    const rowsMap = new Map<number, any[]>();
+    const rowsMap = new Map<string, any[]>();
     sectionSeats.forEach((seat) => {
       const row = seat.rowNumber;
       if (!rowsMap.has(row)) rowsMap.set(row, []);
@@ -520,6 +641,13 @@ export default function StadiumLayout() {
       .map(([rowLabel, seats]) => ({ rowLabel: rowLabel.toString(), seats }))
       .sort((a, b) => parseInt(a.rowLabel) - parseInt(b.rowLabel));
   }, [sectionSeats, selectedSeatIdSet]);
+
+  const txExplorerUrl = useMemo(() => {
+    const txHash = writes.receiptQuery.data?.transactionHash;
+    if (!txHash) return "";
+    const normalizedBase = TX_EXPLORER_BASE_URL.replace(/\/$/, "");
+    return `${normalizedBase}/${txHash}`;
+  }, [writes.receiptQuery.data?.transactionHash]);
 
   return (
     <div className="w-full min-h-screen bg-white flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 overflow-x-hidden">
@@ -591,10 +719,10 @@ export default function StadiumLayout() {
               {
                 label: "Available",
                 color: "bg-emerald-500",
-                val: availableCount,
+                val: dashboardCounts.available,
               },
-              { label: "Locked", color: "bg-slate-200", val: 0 },
-              { label: "Sold", color: "bg-rose-500", val: 1 },
+              { label: "Locked", color: "bg-slate-200", val: dashboardCounts.locked },
+              { label: "Sold", color: "bg-rose-500", val: dashboardCounts.sold },
             ].map((item) => (
               <div
                 key={item.label}
@@ -659,7 +787,7 @@ export default function StadiumLayout() {
             <div className="lg:sticky lg:top-28 self-start">
               <OrderSummary
                 selectedSeats={selectedSeats}
-                availableCount={availableCount}
+                availableCount={dashboardCounts.available}
                 prices={pricesQ.prices}
                 isBusy={writes.isWriting || writes.receiptQuery.isLoading}
                 onConfirm={confirmPurchase}
@@ -760,11 +888,7 @@ export default function StadiumLayout() {
                 <div className="flex flex-col items-center">
                   <div className="bg-white p-6 rounded-[32px] shadow-xl border-2 border-slate-50 relative group">
                     <QRCodeSVG
-                      value={JSON.stringify({
-                        txHash: writes.receiptQuery.data?.transactionHash,
-                        walletAddress,
-                        timestamp: qrIssuedAt,
-                      })}
+                      value={txExplorerUrl}
                       size={200}
                     />
                     <div className="absolute -bottom-2 -right-2 bg-emerald-600 p-2.5 rounded-xl border-4 border-white shadow-lg">
@@ -779,12 +903,12 @@ export default function StadiumLayout() {
                       Total Booked
                     </span>
                     <span className="text-xl font-black">
-                      {selectedSeats.length}
+                        {confirmedSeats.length}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
-                    {selectedSeats.map((seat) => (
+                      {confirmedSeats.map((seat) => (
                       <div
                         key={seat.id}
                         className="flex items-center justify-between p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100"
@@ -814,7 +938,10 @@ export default function StadiumLayout() {
                   </div>
                 </div>
                 <Button
-                  onClick={() => setShowQRModal(false)}
+                  onClick={() => {
+                    setShowQRModal(false);
+                    setConfirmedSeats([]);
+                  }}
                   className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
                 >
                   Confirm & Close <ArrowRight className="h-5 w-5" />

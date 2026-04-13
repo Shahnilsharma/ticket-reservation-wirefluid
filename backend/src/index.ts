@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import ticketRoutes from './routes/ticketRoutes.js';
 import prisma from './services/db.js';
 import { initSocketServer } from './services/socket.js';
+import { startContractSyncWorker, stopContractSyncWorker } from './services/contract-sync.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -38,6 +39,7 @@ initSocketServer(server);
 server.listen(port, async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
+    startContractSyncWorker();
     console.log("Successfully connected to the 'ticket_db' PostgreSQL database.");
     console.log(`Backend server started at http://localhost:${port}`);
     console.log('Socket.IO is enabled on the same host/port.');
@@ -48,6 +50,7 @@ server.listen(port, async () => {
 });
 
 process.on('SIGINT', async () => {
+  stopContractSyncWorker();
   await prisma.$disconnect();
   console.log('\nPrisma disconnected: graceful shutdown complete.');
   process.exit();

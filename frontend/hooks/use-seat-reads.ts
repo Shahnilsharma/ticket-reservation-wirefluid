@@ -5,7 +5,7 @@ import { useReadContract, useReadContracts } from "wagmi";
 import { STADIUM_CONTRACT } from "../lib/contract-config";
 
 export function useBasePrices(eventId: number = 1) {
-  const contracts = [1, 2, 3, 4, 5, 6].map((section) => ({
+  const contracts = [1, 2, 3].map((section) => ({
     ...STADIUM_CONTRACT,
     functionName: "basePrices" as const,
     args: [BigInt(eventId || 1), BigInt(section)],

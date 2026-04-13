@@ -3,6 +3,7 @@ import { verifyMessage } from 'viem';
 import { mainnet } from 'viem/chains';
 import prisma from '../services/db.js';
 import { getSocketServer } from '../services/socket.js';
+import { syncContractState } from '../services/contract-sync.js';
 
 const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -14,6 +15,8 @@ export const getBookings = async (req: Request, res: Response, next: NextFunctio
   }
 
   try {
+    void syncContractState();
+
     const bookings = await prisma.seat.findMany({
       where: {
         walletAddress: walletAddress.toLowerCase(),
@@ -123,6 +126,8 @@ async function releaseExpiredLocks(sectionId?: string) {
 
 export const getSections = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    void syncContractState();
+
     await releaseExpiredLocks();
 
     const sections = await prisma.section.findMany({
@@ -176,6 +181,8 @@ export const getSectionSeats = async (req: Request, res: Response, next: NextFun
   const { clientId } = req.params;
 
   try {
+    void syncContractState();
+
     const sections = await prisma.section.findMany({
       include: { stadium: true },
     });
@@ -229,6 +236,8 @@ export const lockSeat = async (req: Request, res: Response, next: NextFunction) 
   }
 
   try {
+    void syncContractState();
+
     await releaseExpiredLocks();
 
     const now = new Date();
@@ -434,13 +443,15 @@ export const confirmPurchase = async (req: Request, res: Response, next: NextFun
   const idsToConfirm = seatIds || [seatId];
 
   try {
+    void syncContractState();
+
     const normalizedWalletAddress = walletAddress.toLowerCase();
 
     const confirmResult = await prisma.seat.updateMany({
       where: {
         id: { in: idsToConfirm },
         walletAddress: normalizedWalletAddress,
-        status: 'LOCKED',
+        status: { in: ['LOCKED', 'SOLD'] },
       },
       data: {
         status: 'SOLD',

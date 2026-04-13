@@ -4,7 +4,8 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ticket, TrendingUp } from 'lucide-react';
 import { useSelectedSeats } from '@/contexts/seat-context';
-import { formatEther } from 'viem';
+
+const NATIVE_TOKEN_SYMBOL = 'WIRE';
 
 export function OrderSummary({
   selectedSeats,
@@ -24,8 +25,7 @@ export function OrderSummary({
   const { removeSeat } = useSelectedSeats();
   
   const displayTotalPrice = selectedSeats.reduce((acc, seat) => {
-    // Assuming we can derive section numeric ID from seat or just using a default if missing
-    // For UI display, we can also just use the Eth value if it's already there
+    // Seat prices are stored in native-token units for display.
     return acc + (seat.priceEth || 0);
   }, 0);
 
@@ -78,7 +78,7 @@ export function OrderSummary({
                   <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                     Row {seat.rowLabel}, Seat {seat.number}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{seat.priceEth} ETH</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{seat.priceEth} {NATIVE_TOKEN_SYMBOL}</p>
                 </div>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
@@ -123,17 +123,17 @@ export function OrderSummary({
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-600 dark:text-slate-400">Subtotal</span>
             <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {displayTotalPrice.toFixed(4)} ETH
+              {displayTotalPrice.toFixed(4)} {NATIVE_TOKEN_SYMBOL}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-600 dark:text-slate-400">Gas Fee</span>
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">~0.0010 ETH</span>
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">~0.0010 {NATIVE_TOKEN_SYMBOL}</span>
           </div>
           <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-800">
             <span className="font-semibold text-slate-900 dark:text-slate-100">Total Price</span>
             <span className="text-lg font-bold bg-linear-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">
-              {(displayTotalPrice + 0.001).toFixed(4)} ETH
+              {(displayTotalPrice + 0.001).toFixed(4)} {NATIVE_TOKEN_SYMBOL}
             </span>
           </div>
         </motion.div>

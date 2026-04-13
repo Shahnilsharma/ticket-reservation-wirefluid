@@ -26,9 +26,9 @@ export const SeatRow = memo(function SeatRow({
   onSeatClick,
 }: SeatRowProps) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="w-6 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">{rowLabel}</span>
-      <div className="flex flex-1 items-center justify-center gap-1.5">
+    <div className="flex items-center gap-1.5">
+      <span className="w-5 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">{rowLabel}</span>
+      <div className="flex flex-1 items-center justify-center gap-1">
         {seats.map((seat) => {
           const isSelected = selectedSeatIds.has(seat.id);
           const splitIndex = Math.ceil(seats.length / 2);
@@ -45,7 +45,7 @@ export const SeatRow = memo(function SeatRow({
           );
         })}
       </div>
-      <span className="w-6 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">{rowLabel}</span>
+      <span className="hidden 2xl:inline w-5 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">{rowLabel}</span>
     </div>
   );
 });

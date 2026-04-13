@@ -77,7 +77,7 @@ export const SeatButton = memo(function SeatButton({
       onClick={() => onSeatClick(seat)}
       whileHover={!isDisabled ? { scale: 1.1, y: -2 } : {}}
       whileTap={!isDisabled ? { scale: 0.95 } : {}}
-      className={`flex h-8 w-8 items-center justify-center rounded-full border transition md:h-9 md:w-9 ${needsAisleGap ? 'ml-3' : ''} ${getSeatClasses(seat.status, isSelected)}`}
+      className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full border transition ${needsAisleGap ? 'ml-2' : ''} ${getSeatClasses(seat.status, isSelected)}`}
       title={`Row ${seat.rowLabel}, Seat ${seat.number}`}
     >
       <SeatGlyph status={seat.status} isSelected={isSelected} />

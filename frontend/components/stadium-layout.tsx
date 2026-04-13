@@ -78,7 +78,7 @@ const SECTION_CONFIGS: {
   {
     id: "north",
     name: "North Stand",
-    shortName: "NORTH",
+    shortName: "N",
     start: 300,
     end: 60,
     fillClass: "fill-slate-100 dark:fill-slate-800",
@@ -87,7 +87,7 @@ const SECTION_CONFIGS: {
   {
     id: "north-east",
     name: "North-East Stand",
-    shortName: "N-E",
+    shortName: "NE",
     start: 60,
     end: 120,
     fillClass: "fill-slate-100 dark:fill-slate-800",
@@ -96,7 +96,7 @@ const SECTION_CONFIGS: {
   {
     id: "south-east",
     name: "South-East Stand",
-    shortName: "S-E",
+    shortName: "SE",
     start: 120,
     end: 180,
     fillClass: "fill-slate-100 dark:fill-slate-800",
@@ -105,7 +105,7 @@ const SECTION_CONFIGS: {
   {
     id: "south",
     name: "South Stand",
-    shortName: "SOUTH",
+    shortName: "S",
     start: 180,
     end: 240,
     fillClass: "fill-slate-100 dark:fill-slate-800",
@@ -114,7 +114,7 @@ const SECTION_CONFIGS: {
   {
     id: "south-west",
     name: "South-West Stand",
-    shortName: "S-W",
+    shortName: "SW",
     start: 240,
     end: 300,
     fillClass: "fill-slate-100 dark:fill-slate-800",
@@ -123,7 +123,7 @@ const SECTION_CONFIGS: {
   {
     id: "north-west",
     name: "North-West Stand",
-    shortName: "N-W",
+    shortName: "NW",
     start: 300,
     end: 360,
     fillClass: "fill-slate-50 dark:fill-slate-900",
@@ -743,19 +743,19 @@ export default function StadiumLayout() {
         </div>
 
         {activeSection ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-12">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px] gap-8 xl:gap-10 2xl:gap-12">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-[40px] border border-slate-100 bg-slate-50/30 p-12 shadow-inner overflow-auto dark:border-emerald-500/10 dark:bg-[#0b1512]/85"
+              className="min-w-0 rounded-[40px] border border-slate-100 bg-slate-50/30 p-5 md:p-6 lg:p-8 xl:p-10 shadow-inner dark:border-emerald-500/10 dark:bg-[#0b1512]/85"
             >
-              <div className="mx-auto w-fit">
+              <div className="mx-auto max-w-full overflow-x-auto overflow-y-hidden pb-2 custom-scrollbar [scrollbar-gutter:stable]">
                 {loadingSectionSeats ? (
                   <div className="py-20 text-center text-slate-400 animate-pulse font-bold">
                     Loading Section Map...
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="mx-auto w-max min-w-full space-y-2">
                     {activeRows.map((row) => (
                       <SeatRow
                         key={row.rowLabel}
@@ -784,7 +784,7 @@ export default function StadiumLayout() {
                 </div>
               </div>
             </motion.div>
-            <div className="lg:sticky lg:top-28 self-start">
+            <div className="xl:sticky xl:top-28 self-start">
               <OrderSummary
                 selectedSeats={selectedSeats}
                 availableCount={dashboardCounts.available}

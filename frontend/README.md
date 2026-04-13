@@ -2,6 +2,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Create your local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Set `NEXT_PUBLIC_BACKEND_URL` in `.env.local` to your backend API base URL.
+
 First, run the development server:
 
 ```bash
@@ -32,5 +40,9 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+In Vercel project settings, define:
+
+- `NEXT_PUBLIC_BACKEND_URL=https://<your-backend-domain>`
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

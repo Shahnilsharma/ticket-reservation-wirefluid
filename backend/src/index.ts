@@ -10,11 +10,28 @@ import { startContractSyncWorker, stopContractSyncWorker } from './services/cont
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
+const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(morgan('dev'));
+
+app.get('/healthz', (_req: Request, res: Response) => {
+  res.status(200).json({
+    ok: true,
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // API Routes
 app.use('/api/tickets', ticketRoutes);
@@ -36,6 +53,29 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 const server = http.createServer(app);
 initSocketServer(server);
 
+let shuttingDown = false;
+
+async function shutdown(signal: NodeJS.Signals) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+  stopContractSyncWorker();
+
+  server.close(async () => {
+    await prisma.$disconnect();
+    console.log('Prisma disconnected: graceful shutdown complete.');
+    process.exit(0);
+  });
+
+  setTimeout(async () => {
+    await prisma.$disconnect();
+    process.exit(1);
+  }, 10_000).unref();
+}
+
 server.listen(port, async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -49,9 +89,10 @@ server.listen(port, async () => {
   }
 });
 
-process.on('SIGINT', async () => {
-  stopContractSyncWorker();
-  await prisma.$disconnect();
-  console.log('\nPrisma disconnected: graceful shutdown complete.');
-  process.exit();
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
 });

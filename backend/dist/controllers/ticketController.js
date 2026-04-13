@@ -1,7 +1,50 @@
 import { verifyMessage } from 'viem';
 import prisma from '../services/db.js';
 import { getSocketServer } from '../services/socket.js';
+import { syncContractState } from '../services/contract-sync.js';
 const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+export const getBookings = async (req, res, next) => {
+    const { walletAddress } = req.query;
+    if (!walletAddress || typeof walletAddress !== 'string') {
+        return res.status(400).json({ error: 'walletAddress query parameter is required' });
+    }
+    try {
+        void syncContractState();
+        const bookings = await prisma.seat.findMany({
+            where: {
+                walletAddress: walletAddress.toLowerCase(),
+                status: 'SOLD',
+            },
+            include: {
+                section: {
+                    include: {
+                        stadium: true,
+                    },
+                },
+            },
+            orderBy: {
+                id: 'desc',
+            },
+        });
+        return res.status(200).json({
+            bookings: bookings.map((seat) => ({
+                id: seat.id,
+                rowNumber: seat.rowNumber,
+                seatNumber: seat.seatNumber,
+                price: seat.price,
+                section: {
+                    id: seat.section.id,
+                    name: seat.section.name,
+                    stadium: seat.section.stadium.name,
+                },
+                bookedAt: seat.updatedAt,
+            })),
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+};
 function toSectionClientId(sectionName) {
     const normalized = sectionName.toLowerCase().replace(/\s+stand$/, '').replace(/\s+/g, '-');
     if (normalized === 'north' ||
@@ -20,20 +63,50 @@ function toClientSeatStatus(status) {
 function isValidWalletAddress(address) {
     return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
+async function releaseExpiredLocks(sectionId) {
+    const now = new Date();
+    const where = {
+        status: 'LOCKED',
+        lockedUntil: { lt: now },
+        ...(sectionId ? { sectionId } : {}),
+    };
+    const expiredSeats = await prisma.seat.findMany({
+        where,
+        select: {
+            id: true,
+            sectionId: true,
+        },
+    });
+    if (expiredSeats.length === 0) {
+        return [];
+    }
+    await prisma.seat.updateMany({
+        where: { id: { in: expiredSeats.map((seat) => seat.id) } },
+        data: {
+            status: 'AVAILABLE',
+            lockedUntil: null,
+            walletAddress: null,
+        },
+    });
+    const io = getSocketServer();
+    expiredSeats.forEach((seat) => {
+        io?.emit('seat.unlocked', {
+            seatId: seat.id,
+            sectionId: seat.sectionId,
+            status: 'AVAILABLE',
+        });
+        io?.to(`section:${seat.sectionId}`).emit('section.seat.unlocked', {
+            seatId: seat.id,
+            sectionId: seat.sectionId,
+            status: 'AVAILABLE',
+        });
+    });
+    return expiredSeats;
+}
 export const getSections = async (req, res, next) => {
     try {
-        const now = new Date();
-        await prisma.seat.updateMany({
-            where: {
-                status: 'LOCKED',
-                lockedUntil: { lt: now },
-            },
-            data: {
-                status: 'AVAILABLE',
-                lockedUntil: null,
-                walletAddress: null,
-            },
-        });
+        void syncContractState();
+        await releaseExpiredLocks();
         const sections = await prisma.section.findMany({
             include: { stadium: true },
             orderBy: { name: 'asc' },
@@ -82,6 +155,7 @@ export const getSections = async (req, res, next) => {
 export const getSectionSeats = async (req, res, next) => {
     const { clientId } = req.params;
     try {
+        void syncContractState();
         const sections = await prisma.section.findMany({
             include: { stadium: true },
         });
@@ -89,19 +163,7 @@ export const getSectionSeats = async (req, res, next) => {
         if (!matchedSection) {
             return res.status(404).json({ error: 'Section not found' });
         }
-        const now = new Date();
-        await prisma.seat.updateMany({
-            where: {
-                sectionId: matchedSection.id,
-                status: 'LOCKED',
-                lockedUntil: { lt: now },
-            },
-            data: {
-                status: 'AVAILABLE',
-                lockedUntil: null,
-                walletAddress: null,
-            },
-        });
+        await releaseExpiredLocks(matchedSection.id);
         const seats = await prisma.seat.findMany({
             where: { sectionId: matchedSection.id },
             orderBy: [{ rowNumber: 'asc' }, { seatNumber: 'asc' }],
@@ -141,6 +203,8 @@ export const lockSeat = async (req, res, next) => {
         return res.status(400).json({ error: 'Invalid walletAddress format.' });
     }
     try {
+        void syncContractState();
+        await releaseExpiredLocks();
         const now = new Date();
         const lockedUntilTime = new Date(now.getTime() + LOCK_DURATION_MS);
         const normalizedWalletAddress = walletAddress.toLowerCase();
@@ -312,40 +376,40 @@ export const getTicketMetadata = async (req, res, next) => {
  * Permanently locks the seat after a successful blockchain transaction.
  */
 export const confirmPurchase = async (req, res, next) => {
-    const { seatId, txHash, walletAddress } = req.body;
-    if (!seatId || !txHash || !walletAddress) {
-        return res.status(400).json({ error: 'seatId, txHash and walletAddress are required' });
+    const { seatId, seatIds, txHash, walletAddress } = req.body;
+    if ((!seatId && (!seatIds || !Array.isArray(seatIds))) || !txHash || !walletAddress) {
+        return res.status(400).json({ error: 'seatId (or seatIds array), txHash and walletAddress are required' });
     }
     if (!isValidWalletAddress(walletAddress)) {
         return res.status(400).json({ error: 'Invalid walletAddress format.' });
     }
+    const idsToConfirm = seatIds || [seatId];
     try {
-        const now = new Date();
-        // Note: In production, use `viem` to verify `txHash` authenticity here on-chain first
-        // before marking the database as confirmed.
+        void syncContractState();
+        const normalizedWalletAddress = walletAddress.toLowerCase();
         const confirmResult = await prisma.seat.updateMany({
             where: {
-                id: seatId,
-                walletAddress: walletAddress.toLowerCase(),
-                status: 'LOCKED', // Important: It MUST be locked by this exact user
-                lockedUntil: { gte: now }, // Prevent confirming expired locks
+                id: { in: idsToConfirm },
+                walletAddress: normalizedWalletAddress,
+                status: { in: ['LOCKED', 'SOLD'] },
             },
             data: {
                 status: 'SOLD',
-                lockedUntil: null // Clear the expiry timer, payment is complete
+                lockedUntil: null,
+                walletAddress: normalizedWalletAddress,
             }
         });
         if (confirmResult.count === 0) {
             return res.status(400).json({
-                error: 'Failed to confirm purchase. Seat is no longer locked by you or was never locked.'
+                error: 'Failed to confirm purchase. Seats are no longer locked by you or were never locked.'
             });
         }
-        const soldSeat = await prisma.seat.findUnique({
-            where: { id: seatId },
+        const soldSeats = await prisma.seat.findMany({
+            where: { id: { in: idsToConfirm } },
             include: { section: { include: { stadium: true } } }
         });
-        if (soldSeat) {
-            const io = getSocketServer();
+        const io = getSocketServer();
+        for (const soldSeat of soldSeats) {
             io?.emit('seat.sold', {
                 seatId: soldSeat.id,
                 sectionId: soldSeat.sectionId,
@@ -359,7 +423,7 @@ export const confirmPurchase = async (req, res, next) => {
                 status: soldSeat.status,
             });
         }
-        return res.status(200).json({ message: 'Purchase confirmed seamlessly!' });
+        return res.status(200).json({ message: 'Purchase confirmed seamlessly!', confirmedCount: confirmResult.count });
     }
     catch (error) {
         next(error);

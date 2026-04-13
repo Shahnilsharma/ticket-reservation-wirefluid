@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wirefluid-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ticket_db
+      POSTGRES_USER: ticket_user
+      POSTGRES_PASSWORD: ticket_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - wirefluid-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticket_user -d ticket_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: wirefluid-backend:latest
+    container_name: wirefluid-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://ticket_user:ticket_password@postgres:5432/ticket_db?schema=public}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      WIREFLUID_CONTRACT_ADDRESS: ${WIREFLUID_CONTRACT_ADDRESS:-0x5D21dA3Fd25Af95f6b26E8b8784C431E06D5A940}
+      WIREFLUID_RPC_URL: ${WIREFLUID_RPC_URL:-https://evm.wirefluid.com}
+      CONTRACT_SYNC_INTERVAL_MS: ${CONTRACT_SYNC_INTERVAL_MS:-30000}
+      CONTRACT_SYNC_BATCH_SIZE: ${CONTRACT_SYNC_BATCH_SIZE:-150}
+      RUN_DB_PUSH_ON_START: ${RUN_DB_PUSH_ON_START:-true}
+      RUN_MIGRATIONS_ON_START: ${RUN_MIGRATIONS_ON_START:-false}
+    ports:
+      - "4000:4000"
+
+volumes:
+  wirefluid-postgres-data:

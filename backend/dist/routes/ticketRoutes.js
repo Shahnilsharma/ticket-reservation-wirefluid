@@ -1,6 +1,8 @@
 import { Router } from 'express';
-import { lockSeat, unlockSeat, getTicketMetadata, confirmPurchase, verifyEntry, getSections, getSectionSeats, } from '../controllers/ticketController.js';
+import { lockSeat, unlockSeat, getTicketMetadata, confirmPurchase, verifyEntry, getSections, getSectionSeats, getBookings, } from '../controllers/ticketController.js';
 const router = Router();
+// Bookings per wallet
+router.get('/bookings', getBookings);
 // 2. Atomic Soft Lock
 router.post('/lock', lockSeat);
 router.post('/unlock', unlockSeat);

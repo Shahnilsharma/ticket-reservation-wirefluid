@@ -6,6 +6,10 @@ This repository is best deployed as:
 - Backend as a Docker container on a VM/container host.
 - PostgreSQL as a managed service (recommended) or Docker service.
 
+Current frontend production URL:
+
+- `https://ticket-reservation-wirefluid.vercel.app`
+
 ## Why This Topology
 
 - Next.js officially supports Vercel directly with standard `build` and `start` scripts.
@@ -34,7 +38,7 @@ docker run -d \
   -e NODE_ENV=production \
   -e PORT=4000 \
   -e DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DB?schema=public' \
-  -e CORS_ORIGIN='https://your-vercel-app.vercel.app' \
+  -e CORS_ORIGIN='https://ticket-reservation-wirefluid.vercel.app' \
   -e WIREFLUID_RPC_URL='https://evm.wirefluid.com' \
   -e WIREFLUID_CONTRACT_ADDRESS='0x5D21dA3Fd25Af95f6b26E8b8784C431E06D5A940' \
   wirefluid-backend:latest
@@ -89,7 +93,7 @@ This compose file defaults to:
 
 - Postgres on `localhost:5432`
 - Backend on `localhost:4000`
-- `RUN_DB_PUSH_ON_START=true` to auto-create schema for first boot
+- `RUN_DB_PUSH_ON_START=false` to avoid modifying existing database state
 
 Stop it with:
 
@@ -133,7 +137,7 @@ Optional startup flags:
 
 Current repository state does not include a `prisma/migrations` folder. Because of that:
 
-- `RUN_DB_PUSH_ON_START=true` is used for easy bootstrap.
+- `RUN_DB_PUSH_ON_START=false` is the safe default for existing production state.
 - Long-term production should migrate to migration-driven deploys (`prisma migrate deploy`) in CI/CD.
 
 Suggested next step to move to migration workflow:

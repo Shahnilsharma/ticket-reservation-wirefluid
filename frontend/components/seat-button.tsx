@@ -23,15 +23,15 @@ type SeatButtonProps = {
 
 function getSeatClasses(status: SeatStatus, isSelected: boolean): string {
   if (isSelected) {
-    return 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-600 text-white ring-2 ring-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.3)]';
+    return 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-600 text-white ring-2 ring-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.3)] dark:ring-emerald-500/20';
   }
   if (status === 'available') {
-    return 'bg-white border-emerald-300 text-emerald-600 hover:bg-emerald-50 hover:shadow-md cursor-pointer transition-all duration-200';
+    return 'bg-white border-emerald-300 text-emerald-600 hover:bg-emerald-50 hover:shadow-md cursor-pointer transition-all duration-200 dark:border-slate-600 dark:bg-slate-800/80 dark:text-emerald-300 dark:hover:bg-slate-700';
   }
   if (status === 'locked') {
-    return 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-60';
+    return 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-60 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-500';
   }
-  return 'bg-rose-100 border-rose-300 text-rose-500 cursor-not-allowed opacity-70';
+  return 'bg-rose-100 border-rose-300 text-rose-500 cursor-not-allowed opacity-70 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300';
 }
 
 function SeatGlyph({ status, isSelected }: { status: SeatStatus; isSelected: boolean }) {

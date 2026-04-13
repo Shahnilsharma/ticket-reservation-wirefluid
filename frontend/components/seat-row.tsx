@@ -27,7 +27,7 @@ export const SeatRow = memo(function SeatRow({
 }: SeatRowProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-6 text-center text-xs font-semibold text-slate-500">{rowLabel}</span>
+      <span className="w-6 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">{rowLabel}</span>
       <div className="flex flex-1 items-center justify-center gap-1.5">
         {seats.map((seat) => {
           const isSelected = selectedSeatIds.has(seat.id);
@@ -45,7 +45,7 @@ export const SeatRow = memo(function SeatRow({
           );
         })}
       </div>
-      <span className="w-6 text-center text-xs font-semibold text-slate-500">{rowLabel}</span>
+      <span className="w-6 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">{rowLabel}</span>
     </div>
   );
 });

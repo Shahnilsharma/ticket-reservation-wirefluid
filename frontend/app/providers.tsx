@@ -6,6 +6,7 @@ import { http, WagmiProvider, createConfig } from 'wagmi';
 import { mainnet, sepolia, hardhat } from 'wagmi/chains';
 import { metaMask } from 'wagmi/connectors';
 import { SeatProvider } from '@/contexts/seat-context';
+import { ThemeProvider } from '@/components/theme-provider';
 
 import { wireFluid } from '@/lib/chain';
 
@@ -33,9 +34,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <SeatProvider>
-          {children}
-        </SeatProvider>
+        <ThemeProvider>
+          <SeatProvider>
+            {children}
+          </SeatProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

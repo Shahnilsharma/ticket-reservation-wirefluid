@@ -1,9 +1,25 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --background-secondary: #f8f9fa;
+  --background: #f7faf8;
+  --background-secondary: #eef4f1;
   --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary-foreground: #f8fffb;
+  --secondary-foreground: #0f172a;
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
+  --accent: #d1fae5;
+  --accent-foreground: #064e3b;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --ring: #10b981;
+  --input: #cbd5e1;
   
   /* Web3 Premium Colors */
   --primary: #10b981;
@@ -32,9 +48,45 @@
   --glass-border: rgba(229, 231, 235, 0.5);
 }
 
+.dark {
+  --background: #09120f;
+  --background-secondary: #0f1a18;
+  --foreground: #e5eef0;
+  --card: #0f1a18;
+  --card-foreground: #e5eef0;
+  --popover: #0f1a18;
+  --popover-foreground: #e5eef0;
+  --primary-foreground: #07110d;
+  --secondary-foreground: #e5eef0;
+  --muted: #13211e;
+  --muted-foreground: #94a3b8;
+  --accent: #123126;
+  --accent-foreground: #d1fae5;
+  --destructive: #f87171;
+  --destructive-foreground: #150b0b;
+  --ring: #34d399;
+  --input: #20322d;
+  --border: #20322d;
+  --glass-bg: rgba(8, 18, 15, 0.72);
+  --glass-border: rgba(52, 211, 153, 0.12);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -44,10 +96,18 @@
 }
 
 body {
-  background: linear-gradient(135deg, var(--background) 0%, var(--background-secondary) 100%);
-  color: var(--text-primary);
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(16, 185, 129, 0.08), transparent 32%),
+    linear-gradient(180deg, var(--background) 0%, var(--background-secondary) 100%);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Inter, Arial, Helvetica, sans-serif;
   min-height: 100vh;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top, rgba(16, 185, 129, 0.12), transparent 30%),
+    linear-gradient(180deg, var(--background) 0%, #07100e 100%);
 }
 
 /* Smooth scroll behavior */
@@ -96,5 +156,9 @@ html {
 
 /* Glow effects */
 .glow-emerald {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.18);
+}
+
+.dark .glow-emerald {
+  box-shadow: 0 0 22px rgba(52, 211, 153, 0.16);
 }

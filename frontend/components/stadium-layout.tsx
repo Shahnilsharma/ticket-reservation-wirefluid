@@ -81,8 +81,8 @@ const SECTION_CONFIGS: {
     shortName: "NORTH",
     start: 300,
     end: 60,
-    fillClass: "fill-slate-100",
-    hoverClass: "hover:fill-emerald-200",
+    fillClass: "fill-slate-100 dark:fill-slate-800",
+    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
   },
   {
     id: "north-east",
@@ -90,8 +90,8 @@ const SECTION_CONFIGS: {
     shortName: "N-E",
     start: 60,
     end: 120,
-    fillClass: "fill-slate-100",
-    hoverClass: "hover:fill-emerald-200",
+    fillClass: "fill-slate-100 dark:fill-slate-800",
+    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
   },
   {
     id: "south-east",
@@ -99,8 +99,8 @@ const SECTION_CONFIGS: {
     shortName: "S-E",
     start: 120,
     end: 180,
-    fillClass: "fill-slate-100",
-    hoverClass: "hover:fill-emerald-200",
+    fillClass: "fill-slate-100 dark:fill-slate-800",
+    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
   },
   {
     id: "south",
@@ -108,8 +108,8 @@ const SECTION_CONFIGS: {
     shortName: "SOUTH",
     start: 180,
     end: 240,
-    fillClass: "fill-slate-100",
-    hoverClass: "hover:fill-emerald-200",
+    fillClass: "fill-slate-100 dark:fill-slate-800",
+    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
   },
   {
     id: "south-west",
@@ -117,8 +117,8 @@ const SECTION_CONFIGS: {
     shortName: "S-W",
     start: 240,
     end: 300,
-    fillClass: "fill-slate-100",
-    hoverClass: "hover:fill-emerald-200",
+    fillClass: "fill-slate-100 dark:fill-slate-800",
+    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
   },
   {
     id: "north-west",
@@ -126,8 +126,8 @@ const SECTION_CONFIGS: {
     shortName: "N-W",
     start: 300,
     end: 360,
-    fillClass: "fill-slate-50",
-    hoverClass: "hover:fill-emerald-50",
+    fillClass: "fill-slate-50 dark:fill-slate-900",
+    hoverClass: "hover:fill-emerald-50 dark:hover:fill-emerald-500/10",
   },
 ];
 
@@ -650,9 +650,9 @@ export default function StadiumLayout() {
   }, [writes.receiptQuery.data?.transactionHash]);
 
   return (
-    <div className="w-full min-h-screen bg-white flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 overflow-x-hidden">
-      <motion.header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between px-6 lg:px-8 text-slate-900">
+    <div className="w-full min-h-screen bg-background flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 dark:selection:bg-emerald-900 dark:selection:text-emerald-50 overflow-x-hidden">
+      <motion.header className="sticky top-0 z-50 w-full border-b border-slate-100/80 bg-white/80 backdrop-blur-md dark:border-emerald-500/10 dark:bg-[#07110f]/80">
+        <div className="mx-auto flex h-20 max-w-[1400px] items-center justify-between px-6 lg:px-8 text-slate-900 dark:text-slate-100">
           <Link href="/" className="group flex items-center gap-2">
             <div className="bg-emerald-600 p-2 rounded-lg group-hover:scale-110 transition-transform shadow-md shadow-emerald-200">
               <LayoutGrid className="h-5 w-5 text-white" />
@@ -666,7 +666,7 @@ export default function StadiumLayout() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="hidden md:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-300 transition shadow-sm"
+                className="hidden md:inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-300 transition shadow-sm dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-200 dark:hover:border-emerald-500/30"
               >
                 <Ticket className="h-4 w-4 text-emerald-600" /> My Bookings
               </motion.button>
@@ -685,7 +685,7 @@ export default function StadiumLayout() {
         </div>
       </motion.header>
 
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-12 lg:px-8 text-slate-900">
+      <main className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-12 lg:px-8 text-slate-900 dark:text-slate-100">
         <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-4">
             {activeSection && (
@@ -693,18 +693,18 @@ export default function StadiumLayout() {
                 onClick={() => setActiveSectionId(null)}
                 className="inline-flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-emerald-600 transition-all group"
               >
-                <div className="bg-slate-50 p-1.5 rounded-full group-hover:bg-emerald-50 transition-colors">
+                <div className="bg-slate-50 p-1.5 rounded-full group-hover:bg-emerald-50 transition-colors dark:bg-slate-900 dark:group-hover:bg-emerald-500/10">
                   <ChevronLeft className="h-4 w-4" />
                 </div>{" "}
                 Back to Overview
               </button>
             )}
             <div className="flex flex-col">
-              <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100/50 w-fit mb-2">
+              <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100/50 w-fit mb-2 dark:border-emerald-500/10 dark:bg-emerald-500/10 dark:text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />{" "}
                 Live Status
               </div>
-              <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-slate-900">
+              <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-slate-900 dark:text-white">
                 {activeSection ? activeSection.name : "Select Your Stand"}
               </h1>
               <p className="text-slate-500 text-lg font-medium mt-2">
@@ -726,14 +726,14 @@ export default function StadiumLayout() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="flex items-center gap-2 bg-white border border-slate-100 px-4 py-2.5 rounded-2xl shadow-sm"
+                className="flex items-center gap-2 bg-white border border-slate-100 px-4 py-2.5 rounded-2xl shadow-sm dark:border-slate-700 dark:bg-slate-950/60 dark:shadow-none"
               >
                 <span className={`h-2 w-2 rounded-full ${item.color}`} />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest dark:text-slate-500">
                   {item.label}
                 </span>
                 {item.val !== undefined && (
-                  <span className="ml-1 font-black text-slate-900">
+                  <span className="ml-1 font-black text-slate-900 dark:text-slate-100">
                     {item.val}
                   </span>
                 )}
@@ -747,7 +747,7 @@ export default function StadiumLayout() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-[40px] border border-slate-100 bg-slate-50/30 p-12 shadow-inner overflow-auto"
+              className="rounded-[40px] border border-slate-100 bg-slate-50/30 p-12 shadow-inner overflow-auto dark:border-emerald-500/10 dark:bg-[#0b1512]/85"
             >
               <div className="mx-auto w-fit">
                 {loadingSectionSeats ? (
@@ -768,15 +768,15 @@ export default function StadiumLayout() {
                   </div>
                 )}
               </div>
-              <div className="mt-12 flex items-start gap-4 p-6 bg-white rounded-3xl border border-slate-100 shadow-sm max-w-2xl mx-auto">
-                <div className="bg-emerald-100 p-3 rounded-2xl text-slate-900">
+              <div className="mt-12 flex items-start gap-4 p-6 bg-white rounded-3xl border border-slate-100 shadow-sm max-w-2xl mx-auto dark:border-slate-700 dark:bg-slate-950/70">
+                  <div className="bg-emerald-100 p-3 rounded-2xl text-slate-900 dark:bg-emerald-500/10 dark:text-emerald-300">
                   <Info className="h-6 w-6 text-emerald-600 shrink-0" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900">
+                  <h4 className="font-bold text-slate-900 dark:text-white">
                     Seating Information
                   </h4>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed mt-1">
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed mt-1 dark:text-slate-400">
                     Select seats to reserve them. Greenhouse icons are
                     available. Your selections are automatically locked for 5
                     minutes.
@@ -806,15 +806,15 @@ export default function StadiumLayout() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-12"
           >
-             <div className="w-full relative max-w-[1000px] bg-slate-50/50 rounded-[60px] p-8 md:p-16 border border-slate-100 shadow-2xl">
+             <div className="w-full relative max-w-[1000px] bg-slate-50/50 rounded-[60px] p-8 md:p-16 border border-slate-100 shadow-2xl dark:border-emerald-500/10 dark:bg-[#0b1512]/85">
                <svg viewBox="0 0 1000 760" className="mx-auto h-auto w-full drop-shadow-2xl">
                   {/* Outer Stadium Body */}
-                  <rect x="50" y="20" width="900" height="720" rx="60" className="fill-slate-50 stroke-slate-200 stroke-[2px]" />
-                  <rect x="70" y="40" width="860" height="680" rx="50" className="fill-white stroke-slate-100 stroke-[1px]" />
+                    <rect x="50" y="20" width="900" height="720" rx="60" className="fill-slate-50 stroke-slate-200 stroke-[2px] dark:fill-slate-900 dark:stroke-slate-700" />
+                    <rect x="70" y="40" width="860" height="680" rx="50" className="fill-white stroke-slate-100 stroke-[1px] dark:fill-slate-950 dark:stroke-slate-800" />
                   
                   {/* Field Area with Grass Stripes */}
                   <g className="field">
-                    <ellipse cx="500" cy="380" rx="220" ry="165" className="fill-emerald-800/10 stroke-emerald-900/20 stroke-[4px]" />
+                    <ellipse cx="500" cy="380" rx="220" ry="165" className="fill-emerald-800/10 stroke-emerald-900/20 stroke-[4px] dark:fill-emerald-500/10 dark:stroke-emerald-400/20" />
                     <mask id="fieldMask">
                       <ellipse cx="500" cy="380" rx="200" ry="145" fill="white" />
                     </mask>
@@ -831,21 +831,21 @@ export default function StadiumLayout() {
                       ))}
                     </g>
                     {/* Inner Field Detail */}
-                    <ellipse cx="500" cy="380" rx="200" ry="145" className="fill-transparent stroke-white/40 stroke-[1px] stroke-dasharray-[10,5]" />
-                    <circle cx="500" cy="380" r="40" className="fill-transparent stroke-white/40 stroke-[1px]" />
-                    <line x1="500" y1="235" x2="500" y2="525" className="stroke-white/40 stroke-[1px]" />
+                    <ellipse cx="500" cy="380" rx="200" ry="145" className="fill-transparent stroke-white/40 stroke-[1px] stroke-dasharray-[10,5] dark:stroke-white/15" />
+                    <circle cx="500" cy="380" r="40" className="fill-transparent stroke-white/40 stroke-[1px] dark:stroke-white/15" />
+                    <line x1="500" y1="235" x2="500" y2="525" className="stroke-white/40 stroke-[1px] dark:stroke-white/15" />
                   </g>
                   
                   {/* Intersecting Section Lines */}
-                  <line x1="500" y1="40" x2="500" y2="235" className="stroke-slate-200 stroke-[4px]" />
-                  <line x1="500" y1="525" x2="500" y2="720" className="stroke-slate-200 stroke-[4px]" />
+                  <line x1="500" y1="40" x2="500" y2="235" className="stroke-slate-200 stroke-[4px] dark:stroke-slate-700" />
+                  <line x1="500" y1="525" x2="500" y2="720" className="stroke-slate-200 stroke-[4px] dark:stroke-slate-700" />
 
                   {/* Sections */}
                   {SECTION_CONFIGS.map((section) => (
                     <g key={section.id} onClick={() => setActiveSectionId(section.id)} className="group cursor-pointer">
                       <path 
                         d={getRingSegmentPath(500, 380, 420, 310, 240, 185, section.start, section.end)} 
-                        className={`${section.fillClass} ${section.hoverClass} stroke-white stroke-[8px] transition-all duration-300 drop-shadow-sm`} 
+                        className={`${section.fillClass} ${section.hoverClass} stroke-white stroke-[8px] transition-all duration-300 drop-shadow-sm dark:stroke-slate-950`} 
                       />
                       <g className="pointer-events-none">
                         <text 
@@ -853,7 +853,7 @@ export default function StadiumLayout() {
                           y={(380 + Math.sin(((section.start + section.end) / 2 - 90) * (Math.PI / 180)) * 245).toFixed(4)} 
                           textAnchor="middle" 
                           alignmentBaseline="middle" 
-                          className="fill-slate-500 text-[16px] font-black uppercase tracking-widest group-hover:fill-emerald-800 transition-colors"
+                          className="fill-slate-500 text-[16px] font-black uppercase tracking-widest group-hover:fill-emerald-800 transition-colors dark:fill-slate-400 dark:group-hover:fill-emerald-300"
                         >
                           {section.shortName}
                         </text>
@@ -873,7 +873,7 @@ export default function StadiumLayout() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md rounded-[40px] bg-white shadow-2xl overflow-hidden ring-1 ring-slate-100"
+              className="w-full max-w-md rounded-[40px] bg-white shadow-2xl overflow-hidden ring-1 ring-slate-100 dark:bg-[#07110f] dark:ring-emerald-500/10"
             >
               <div className="bg-linear-to-br from-emerald-600 to-emerald-700 p-10 text-white relative">
                 <Ticket className="h-24 w-24 absolute -top-4 -right-4 opacity-10 rotate-12" />
@@ -884,21 +884,21 @@ export default function StadiumLayout() {
                   Your digital assets have been verified and secured on-chain.
                 </p>
               </div>
-              <div className="p-10 space-y-8 bg-white">
+              <div className="p-10 space-y-8 bg-white dark:bg-[#07110f]">
                 <div className="flex flex-col items-center">
-                  <div className="bg-white p-6 rounded-[32px] shadow-xl border-2 border-slate-50 relative group">
+                  <div className="bg-white p-6 rounded-[32px] shadow-xl border-2 border-slate-50 relative group dark:border-slate-700 dark:bg-slate-950/70">
                     <QRCodeSVG
                       value={txExplorerUrl}
                       size={200}
                     />
-                    <div className="absolute -bottom-2 -right-2 bg-emerald-600 p-2.5 rounded-xl border-4 border-white shadow-lg">
+                    <div className="absolute -bottom-2 -right-2 bg-emerald-600 p-2.5 rounded-xl border-4 border-white shadow-lg dark:border-slate-950">
                       <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 flex justify-between items-center text-slate-900">
+                  <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 flex justify-between items-center text-slate-900 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                       Total Booked
                     </span>
@@ -911,24 +911,24 @@ export default function StadiumLayout() {
                       {confirmedSeats.map((seat) => (
                       <div
                         key={seat.id}
-                        className="flex items-center justify-between p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100"
+                        className="flex items-center justify-between p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 dark:border-emerald-500/10 dark:bg-emerald-500/5"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="bg-emerald-600 p-2 rounded-lg">
+                          <div className="bg-emerald-600 p-2 rounded-lg dark:bg-emerald-500/15">
                             <Ticket className="h-4 w-4 text-white" />
                           </div>
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/60 leading-none mb-1">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700/60 leading-none mb-1 dark:text-emerald-300/60">
                               {seat.sectionName}
                             </p>
-                            <p className="text-sm font-bold text-slate-900">
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
                               Row {seat.rowLabel}, Seat {seat.number}
                             </p>
                           </div>
                         </div>
                         <Badge
                           variant="outline"
-                          className="border-emerald-200 bg-white text-emerald-700 font-black"
+                          className="border-emerald-200 bg-white text-emerald-700 font-black dark:border-emerald-500/20 dark:bg-slate-950/70 dark:text-emerald-300"
                         >
                           CONFIRMED
                         </Badge>

@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --background-secondary: #f8f9fa;
+  --foreground: #0f172a;
+  
+  /* Web3 Premium Colors */
+  --primary: #10b981;
+  --primary-light: #d1fae5;
+  --primary-dark: #047857;
+  --secondary: #3b82f6;
+  --secondary-light: #dbeafe;
+  --tertiary: #f59e0b;
+  --tertiary-light: #fef3c7;
+  
+  /* Status Colors */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  
+  /* Semantic Colors */
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+  --text-primary: #0f172a;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(229, 231, 235, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  @apply transition-colors duration-200;
+}
+
+body {
+  background: linear-gradient(135deg, var(--background) 0%, var(--background-secondary) 100%);
+  color: var(--text-primary);
+  font-family: Inter, Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #10b98133;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #10b98166;
+}
+
+/* Glassmorphic card utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Emerald gradient utility */
+.gradient-emerald {
+  @apply bg-linear-to-r from-emerald-500 to-emerald-600;
+}
+
+/* Glow effects */
+.glow-emerald {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}

@@ -1,0 +1,41 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "test:socket": "tsx --test tests/socket-events.test.ts",
+    "seed": "tsx src/seed.ts",
+    "reset:seats": "tsx src/reset-seats.ts",
+    "reseed": "npm run seed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.6.0",
+    "@prisma/client": "^7.6.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "morgan": "^1.10.1",
+    "pg": "^8.20.0",
+    "socket.io": "^4.8.1",
+    "viem": "^2.47.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^25.5.0",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.6.0",
+    "socket.io-client": "^4.8.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

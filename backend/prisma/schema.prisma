@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SeatStatus {
+  AVAILABLE
+  LOCKED
+  SOLD
+}
+
+model Stadium {
+  id        String    @id @default(uuid())
+  name      String
+  location  String?
+  sections  Section[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  name      String
+  stadiumId String
+  stadium   Stadium  @relation(fields: [stadiumId], references: [id])
+  seats     Seat[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Seat {
+  id            String     @id @default(uuid())
+  rowNumber     String
+  seatNumber    Int
+  price         Float
+  status        SeatStatus @default(AVAILABLE)
+  lockedUntil   DateTime?
+  walletAddress String?
+  sectionId     String
+  section       Section    @relation(fields: [sectionId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([sectionId, rowNumber, seatNumber])
+}

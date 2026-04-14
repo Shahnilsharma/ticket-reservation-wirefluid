@@ -7,8 +7,7 @@ services:
       POSTGRES_DB: ticket_db
       POSTGRES_USER: ticket_user
       POSTGRES_PASSWORD: ticket_password
-    ports:
-      - "5432:5432"
+    # No ports exposed — postgres is only reachable inside the internal network
     volumes:
       - wirefluid-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +15,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   backend:
     build:
@@ -39,7 +40,13 @@ services:
       RUN_DB_PUSH_ON_START: ${RUN_DB_PUSH_ON_START:-false}
       RUN_MIGRATIONS_ON_START: ${RUN_MIGRATIONS_ON_START:-false}
     ports:
-      - "4000:4000"
+      - "4000:4000"   # API accessible on server IP:4000
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   wirefluid-postgres-data:

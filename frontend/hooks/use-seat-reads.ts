@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReadContract, useReadContracts } from "wagmi";
+import { useReadContracts } from "wagmi";
 import { STADIUM_CONTRACT } from "../lib/contract-config";
+import { wireFluid } from "../lib/chain";
 
 export function useBasePrices(eventId: number = 1) {
   const contracts = [1, 2, 3].map((section) => ({
@@ -11,7 +12,10 @@ export function useBasePrices(eventId: number = 1) {
     args: [BigInt(eventId || 1), BigInt(section)],
   }));
 
-  const query = useReadContracts({ contracts, allowFailure: true });
+  const query = useReadContracts({
+    contracts: contracts.map((contract) => ({ ...contract, chainId: wireFluid.id })),
+    allowFailure: true,
+  });
   const prices = useMemo(() => {
     return {
       1: query.data?.[0]?.result as bigint | undefined,
@@ -41,7 +45,12 @@ export function useSeatStatuses(eventId: number, section: number, rowStart: numb
   }, [eventId, rowEnd, rowStart, seatsPerRow, section]);
 
   const query = useReadContracts({
-    contracts: contracts.map((c) => ({ ...STADIUM_CONTRACT, functionName: "seatTokenId" as const, args: c.args })),
+    contracts: contracts.map((c) => ({
+      ...STADIUM_CONTRACT,
+      functionName: "seatTokenId" as const,
+      args: c.args,
+      chainId: wireFluid.id,
+    })),
     allowFailure: true,
   });
 

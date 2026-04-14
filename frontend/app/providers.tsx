@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, WagmiProvider, createConfig } from 'wagmi';
-import { mainnet, sepolia, hardhat } from 'wagmi/chains';
 import { metaMask } from 'wagmi/connectors';
 import { SeatProvider } from '@/contexts/seat-context';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -11,7 +10,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { wireFluid } from '@/lib/chain';
 
 const config = createConfig({
-  chains: [wireFluid, mainnet, sepolia, hardhat],
+  chains: [wireFluid],
   connectors: [
     metaMask({
       dapp: {
@@ -22,9 +21,6 @@ const config = createConfig({
   ],
   transports: {
     [wireFluid.id]: http(wireFluid.rpcUrls.default.http[0]),
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
-    [hardhat.id]: http(),
   },
 });
 

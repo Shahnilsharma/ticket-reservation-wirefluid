@@ -11,7 +11,7 @@ function ThemeClassSync() {
   const { theme, resolvedTheme } = useTheme()
 
   React.useEffect(() => {
-    const effectiveTheme = (theme === 'system' ? resolvedTheme : theme) ?? 'light'
+    const effectiveTheme = (theme === 'system' ? resolvedTheme : theme) ?? 'dark'
     const root = document.documentElement
 
     // Keep root classes deterministic to prevent mixed light/dark rendering.
@@ -27,7 +27,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="light"
+      defaultTheme="dark"
       enableSystem={false}
       themes={["light", "dark"]}
       storageKey="wirefluid-theme-v2"

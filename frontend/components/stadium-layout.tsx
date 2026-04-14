@@ -16,12 +16,13 @@ import {
   LayoutGrid,
   Info,
   ArrowRight,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import { useConnection, useConnect, useConnectors, useDisconnect } from "wagmi";
+import { useBalance, useChainId, useConnection, useConnect, useDisconnect } from "wagmi";
 import { io, type Socket } from "socket.io-client";
 import { useSelectedSeats } from "@/contexts/seat-context";
 import { SeatRow } from "./seat-row";
@@ -38,15 +39,35 @@ import {
 } from "@/lib/tickets-api";
 import { useBasePrices } from "@/hooks/use-seat-reads";
 import { useSeatWrites } from "@/hooks/use-seat-writes";
-import { normalizeEvmError } from "@/lib/evm-errors";
+import {
+  isInsufficientFundsError,
+  isUnsupportedChainError,
+  normalizeEvmError,
+} from "@/lib/evm-errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { STADIUM_CONTRACT } from "@/lib/contract-config";
 import { usePublicClient } from "wagmi";
+import { formatEther, type Address } from "viem";
+import {
+  wireFluid,
+  wireFluidChainIdHex,
+  wireFluidManualNetworkFields,
+  wireFluidWalletAddParams,
+} from "@/lib/chain";
 
 const TX_EXPLORER_BASE_URL =
   process.env.NEXT_PUBLIC_TX_EXPLORER_BASE_URL ??
   "https://wirefluidscan.com/tx";
+const WIREFLUID_FAUCET_URL =
+  process.env.NEXT_PUBLIC_WIREFLUID_FAUCET_URL ??
+  "https://faucet.wirefluid.com/";
+const DEFAULT_GAS_RESERVE_WEI =
+  BigInt(process.env.NEXT_PUBLIC_MIN_GAS_RESERVE_WEI ?? "2000000000000000");
+
+type InjectedProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
 
 type SectionId =
   | "north"
@@ -83,6 +104,7 @@ const SECTION_CONFIGS: {
     end: 60,
     fillClass: "fill-slate-100 dark:fill-slate-800",
     hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
+    labelOffsetY: -8,
   },
   {
     id: "north-east",
@@ -194,11 +216,22 @@ function getRingSegmentPath(
   return `M ${x1} ${y1} A ${rx} ${ry} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${irx} ${iry} 0 ${largeArc} 0 ${x4} ${y4} Z`;
 }
 
+function getSegmentMidAngle(startAngle: number, endAngle: number) {
+  const sweep = (endAngle - startAngle + 360) % 360;
+  return (startAngle + sweep / 2 + 360) % 360;
+}
+
 export default function StadiumLayout() {
   const { isConnected, address } = useConnection();
-  const { connect, connectors } = useConnect();
+  const { connectAsync, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const publicClient = usePublicClient();
+  const chainId = useChainId();
+  const publicClient = usePublicClient({ chainId: wireFluid.id });
+  const { data: walletBalanceData } = useBalance({
+    address,
+    chainId: wireFluid.id,
+    query: { enabled: Boolean(address) },
+  });
 
   const { selectedSeats, addSeat, removeSeat, clearCart } = useSelectedSeats();
   const selectedSeatIds = useMemo(
@@ -219,6 +252,7 @@ export default function StadiumLayout() {
     null,
   );
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showFaucetModal, setShowFaucetModal] = useState(false);
   const [qrIssuedAt, setQrIssuedAt] = useState<number | null>(null);
   const [confirmedSeats, setConfirmedSeats] = useState<typeof selectedSeats>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -265,6 +299,74 @@ export default function StadiumLayout() {
   const writes = useSeatWrites();
   const pricesQ = useBasePrices(1);
   const walletAddress = address ?? "";
+
+  const setManualNetworkInstructions = useCallback(
+    (reason?: string) => {
+      const instructions = [
+        reason
+          ? `Could not auto-switch your wallet to WireFluid: ${reason}`
+          : "Could not auto-switch your wallet to WireFluid.",
+        "",
+        "Add this network manually in MetaMask:",
+        wireFluidManualNetworkFields,
+      ].join("\n");
+
+      setTxError(instructions);
+      toast.error("Switch wallet network to WireFluid to continue.");
+    },
+    [],
+  );
+
+  const ensureWireFluidNetwork = useCallback(async () => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    const provider = (window as Window & { ethereum?: InjectedProvider })
+      .ethereum;
+
+    if (!provider?.request) {
+      setManualNetworkInstructions("No injected wallet provider found.");
+      return false;
+    }
+
+    try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: wireFluidChainIdHex }],
+      });
+      return true;
+    } catch (switchError) {
+      const code =
+        typeof switchError === "object" &&
+        switchError !== null &&
+        "code" in switchError
+          ? Number((switchError as { code?: unknown }).code)
+          : undefined;
+
+      if (code === 4902) {
+        try {
+          await provider.request({
+            method: "wallet_addEthereumChain",
+            params: [wireFluidWalletAddParams],
+          });
+
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: wireFluidChainIdHex }],
+          });
+
+          return true;
+        } catch (addError) {
+          setManualNetworkInstructions(normalizeEvmError(addError));
+          return false;
+        }
+      }
+
+      setManualNetworkInstructions(normalizeEvmError(switchError));
+      return false;
+    }
+  }, [setManualNetworkInstructions]);
 
   useEffect(() => {
     setHydrated(true);
@@ -496,18 +598,45 @@ export default function StadiumLayout() {
     }
   };
 
-  const handleWalletConnect = () =>
-    isConnected ? disconnect() : connect({ connector: connectors[0] });
+  const handleWalletConnect = useCallback(async () => {
+    if (isConnected) {
+      disconnect();
+      return false;
+    }
+
+    if (!connectors[0]) {
+      toast.error("No wallet connector available.");
+      return false;
+    }
+
+    try {
+      await connectAsync({ connector: connectors[0] });
+      const switched = await ensureWireFluidNetwork();
+      if (!switched) return false;
+      return true;
+    } catch (error) {
+      setTxError(normalizeEvmError(error));
+      return false;
+    }
+  }, [connectAsync, connectors, disconnect, ensureWireFluidNetwork, isConnected]);
 
   const confirmPurchase = async () => {
     if (!isConnected) {
-      handleWalletConnect();
-      return;
+      const connected = await handleWalletConnect();
+      if (!connected) return;
     }
+
     setTxError(null);
     setShowQRModal(false);
+    setShowFaucetModal(false);
     setConfirmedSeats([]);
+
     try {
+      const switched = await ensureWireFluidNetwork();
+      if (!switched) {
+        return;
+      }
+
       const contractSeats = selectedSeats.map((seat) => ({
         section: getContractSectionId(seat.sectionId, seat.sectionName),
         row: rowLabelToContractRow(seat.rowLabel),
@@ -580,6 +709,34 @@ export default function StadiumLayout() {
         BigInt(0),
       );
 
+      if (publicClient && walletAddress) {
+        const latestBalance = await publicClient.getBalance({
+          address: walletAddress as Address,
+        });
+
+        const requiredValue = totalValue + DEFAULT_GAS_RESERVE_WEI;
+        if (latestBalance < requiredValue) {
+          const availableWire = Number(formatEther(latestBalance)).toFixed(6);
+          const requiredWire = Number(formatEther(requiredValue)).toFixed(6);
+          setTxError(
+            `Insufficient WIRE balance. Available: ${availableWire} WIRE. Required (seat + gas buffer): ${requiredWire} WIRE. Claim from faucet and retry.`,
+          );
+          setShowFaucetModal(true);
+          return;
+        }
+      } else if (walletBalanceData?.value != null) {
+        const requiredValue = totalValue + DEFAULT_GAS_RESERVE_WEI;
+        if (walletBalanceData.value < requiredValue) {
+          const availableWire = Number(formatEther(walletBalanceData.value)).toFixed(6);
+          const requiredWire = Number(formatEther(requiredValue)).toFixed(6);
+          setTxError(
+            `Insufficient WIRE balance. Available: ${availableWire} WIRE. Required (seat + gas buffer): ${requiredWire} WIRE. Claim from faucet and retry.`,
+          );
+          setShowFaucetModal(true);
+          return;
+        }
+      }
+
       const params = contractSeats.map((seat) => ({
         eventId: 1,
         section: seat.section,
@@ -591,7 +748,11 @@ export default function StadiumLayout() {
         await writes.reserveSingle(params[0], totalValue);
       else await writes.reserveBatch(params, totalValue);
     } catch (err) {
-      setTxError(normalizeEvmError(err));
+      const normalized = normalizeEvmError(err);
+      setTxError(normalized);
+      if (isInsufficientFundsError(err) || isUnsupportedChainError(err)) {
+        setShowFaucetModal(true);
+      }
     }
   };
 
@@ -674,13 +835,23 @@ export default function StadiumLayout() {
             <Badge
               variant="outline"
               className="hidden sm:flex border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl px-4 py-2 font-bold cursor-pointer hover:bg-emerald-100 transition-colors"
-              onClick={handleWalletConnect}
+              onClick={() => {
+                void handleWalletConnect();
+              }}
             >
               <Wallet className="h-3.5 w-3.5 mr-2" />
               {hydrated && isConnected
                 ? `${address?.substring(0, 6)}...${address?.slice(-4)}`
                 : "Connect"}
             </Badge>
+            {hydrated && isConnected && chainId !== wireFluid.id && (
+              <Badge
+                variant="outline"
+                className="hidden sm:flex border-amber-200 bg-amber-50 text-amber-700 rounded-xl px-4 py-2 font-bold"
+              >
+                Wrong network
+              </Badge>
+            )}
           </div>
         </div>
       </motion.header>
@@ -794,7 +965,7 @@ export default function StadiumLayout() {
                 onRemoveSeat={unlockSeatAndRemove}
               />
               {txError && (
-                <div className="mt-6 p-4 rounded-2xl border border-rose-100 bg-rose-50/50 text-xs font-bold text-rose-600">
+                <div className="mt-6 p-4 rounded-2xl border border-rose-100 bg-rose-50/50 text-xs font-bold text-rose-600 whitespace-pre-line">
                   {txError}
                 </div>
               )}
@@ -820,12 +991,12 @@ export default function StadiumLayout() {
                     </mask>
                     <g mask="url(#fieldMask)">
                       {Array.from({ length: 15 }).map((_, i) => (
-                        <rect 
+                        <rect
                           key={i}
-                          x={i * (1000 / 15)} 
-                          y="0" 
-                          width={(1000 / 30)} 
-                          height="1000" 
+                          x={i * (1000 / 15)}
+                          y="0"
+                          width={1000 / 30}
+                          height="1000"
                           className="fill-emerald-600/5"
                         />
                       ))}
@@ -848,11 +1019,19 @@ export default function StadiumLayout() {
                         className={`${section.fillClass} ${section.hoverClass} stroke-white stroke-[8px] transition-all duration-300 drop-shadow-sm dark:stroke-slate-950`} 
                       />
                       <g className="pointer-events-none">
-                        <text 
-                          x={(500 + Math.cos(((section.start + section.end) / 2 - 90) * (Math.PI / 180)) * 335).toFixed(4)} 
-                          y={(380 + Math.sin(((section.start + section.end) / 2 - 90) * (Math.PI / 180)) * 245).toFixed(4)} 
-                          textAnchor="middle" 
-                          alignmentBaseline="middle" 
+                        <text
+                          x={(
+                            500 +
+                            Math.cos((getSegmentMidAngle(section.start, section.end) - 90) * (Math.PI / 180)) * 335 +
+                            (section.labelOffsetX ?? 0)
+                          ).toFixed(4)}
+                          y={(
+                            380 +
+                            Math.sin((getSegmentMidAngle(section.start, section.end) - 90) * (Math.PI / 180)) * 245 +
+                            (section.labelOffsetY ?? 0)
+                          ).toFixed(4)}
+                          textAnchor="middle"
+                          alignmentBaseline="middle"
                           className="fill-slate-500 text-[16px] font-black uppercase tracking-widest group-hover:fill-emerald-800 transition-colors dark:fill-slate-400 dark:group-hover:fill-emerald-300"
                         >
                           {section.shortName}
@@ -946,6 +1125,52 @@ export default function StadiumLayout() {
                 >
                   Confirm & Close <ArrowRight className="h-5 w-5" />
                 </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showFaucetModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              className="w-full max-w-md rounded-[32px] overflow-hidden ring-1 ring-emerald-500/10 bg-[#07110f] text-slate-100 shadow-[0_20px_80px_rgba(16,185,129,0.16)]"
+            >
+              <div className="bg-linear-to-br from-emerald-600 to-teal-600 p-8 text-white border-b border-emerald-400/20">
+                <h3 className="text-2xl font-black tracking-tight">
+                  Need WIRE to Continue
+                </h3>
+                <p className="text-emerald-50/95 font-medium mt-2 leading-relaxed text-sm">
+                  Your wallet either has insufficient WIRE for gas or is on the wrong chain.
+                </p>
+              </div>
+
+              <div className="p-7 space-y-5 bg-[#07110f]">
+                <div className="text-sm text-slate-300 font-medium leading-relaxed whitespace-pre-line">
+                  Step 1: Switch wallet network to WireFluid.\n
+                  Step 2: Claim WIRE from faucet and retry purchase.
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <Button
+                    onClick={() => {
+                      window.open(WIREFLUID_FAUCET_URL, "_blank", "noopener,noreferrer");
+                    }}
+                    className="h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-500/20"
+                  >
+                    Open WireFluid Faucet <ExternalLink className="h-4 w-4 ml-2" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFaucetModal(false)}
+                    className="h-11 rounded-xl border-slate-900 text-slate-200 hover:bg-slate-900"
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </div>

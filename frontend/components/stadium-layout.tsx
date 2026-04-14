@@ -104,8 +104,8 @@ const SECTION_CONFIGS: {
     end: 60,
     fillClass: "fill-[#22324f] dark:fill-[#17243b]",
     hoverClass: "hover:fill-sky-300/25 dark:hover:fill-sky-300/20",
-    labelOffsetX: 42,
-    labelOffsetY: -8,
+    labelOffsetX: 182,
+    labelOffsetY: 40,
   },
   {
     id: "north-east",

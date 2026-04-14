@@ -98,60 +98,70 @@ const SECTION_CONFIGS: {
 }[] = [
   {
     id: "north",
-    name: "North Stand",
-    shortName: "N",
+    name: "Shaheen Afridi Enclosure",
+    shortName: "SA",
     start: 300,
     end: 60,
-    fillClass: "fill-slate-100 dark:fill-slate-800",
-    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
+    fillClass: "fill-[#22324f] dark:fill-[#17243b]",
+    hoverClass: "hover:fill-sky-300/25 dark:hover:fill-sky-300/20",
+    labelOffsetX: 42,
     labelOffsetY: -8,
   },
   {
     id: "north-east",
-    name: "North-East Stand",
-    shortName: "NE",
+    name: "Fakhar Zaman Enclosure",
+    shortName: "FZ",
     start: 60,
     end: 120,
-    fillClass: "fill-slate-100 dark:fill-slate-800",
-    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
+    fillClass: "fill-[#22324f] dark:fill-[#17243b]",
+    hoverClass: "hover:fill-sky-300/25 dark:hover:fill-sky-300/20",
   },
   {
     id: "south-east",
-    name: "South-East Stand",
-    shortName: "SE",
+    name: "Haris Rauf Enclosure",
+    shortName: "HR",
     start: 120,
     end: 180,
-    fillClass: "fill-slate-100 dark:fill-slate-800",
-    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
+    fillClass: "fill-[#20472f] dark:fill-[#173727]",
+    hoverClass: "hover:fill-emerald-300/30 dark:hover:fill-emerald-300/20",
   },
   {
     id: "south",
-    name: "South Stand",
-    shortName: "S",
+    name: "Hasan Ali Enclosure",
+    shortName: "HA",
     start: 180,
     end: 240,
-    fillClass: "fill-slate-100 dark:fill-slate-800",
-    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
+    fillClass: "fill-[#1f442d] dark:fill-[#163526]",
+    hoverClass: "hover:fill-emerald-300/30 dark:hover:fill-emerald-300/20",
   },
   {
     id: "south-west",
-    name: "South-West Stand",
-    shortName: "SW",
+    name: "Shan Masood Enclosure",
+    shortName: "SM",
     start: 240,
     end: 300,
-    fillClass: "fill-slate-100 dark:fill-slate-800",
-    hoverClass: "hover:fill-emerald-200 dark:hover:fill-emerald-500/20",
+    fillClass: "fill-[#22324f] dark:fill-[#17243b]",
+    hoverClass: "hover:fill-sky-300/25 dark:hover:fill-sky-300/20",
   },
   {
     id: "north-west",
-    name: "North-West Stand",
-    shortName: "NW",
+    name: "Irfan Khan Niazi Enclosure",
+    shortName: "IKN",
     start: 300,
     end: 360,
-    fillClass: "fill-slate-50 dark:fill-slate-900",
-    hoverClass: "hover:fill-emerald-50 dark:hover:fill-emerald-500/10",
+    fillClass: "fill-[#21304a] dark:fill-[#162137]",
+    hoverClass: "hover:fill-sky-300/25 dark:hover:fill-sky-300/20",
   },
 ];
+
+const SECTION_LABELS_BY_CLIENT_ID: Record<SectionId, { name: string; shortName: string }> =
+  SECTION_CONFIGS.reduce(
+    (acc, section) => {
+      acc[section.id] = { name: section.name, shortName: section.shortName };
+      return acc;
+    },
+    {} as Record<SectionId, { name: string; shortName: string }>,
+  );
 
 const CONTRACT_SECTION_BY_STAND: Record<SectionId, 1 | 2 | 3> = {
   north: 1,
@@ -267,7 +277,16 @@ export default function StadiumLayout() {
 
   const refreshSections = useCallback(async () => {
     const response = await fetchSections();
-    setSections(response.sections);
+    setSections(
+      response.sections.map((section) => {
+        const pslLabel = SECTION_LABELS_BY_CLIENT_ID[section.clientId];
+        if (!pslLabel) return section;
+        return {
+          ...section,
+          name: pslLabel.name,
+        };
+      }),
+    );
   }, []);
 
   const activeSection = useMemo(
@@ -857,6 +876,22 @@ export default function StadiumLayout() {
       </motion.header>
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-12 lg:px-8 text-slate-900 dark:text-slate-100">
+        <div className="mb-6 rounded-2xl border border-emerald-200/70 bg-linear-to-r from-emerald-50 via-white to-amber-50 px-4 py-3 shadow-sm dark:border-emerald-500/20 dark:from-emerald-500/10 dark:via-[#0b1512] dark:to-amber-500/10">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+              PSL Matchday • National Cricket Stadium
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+              <span className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 dark:border-emerald-500/20 dark:bg-slate-950/70">
+                Lahore Qalandars
+              </span>
+              <span className="text-slate-400 dark:text-slate-500">vs</span>
+              <span className="rounded-full border border-amber-200 bg-white px-2.5 py-1 dark:border-amber-500/20 dark:bg-slate-950/70">
+                Karachi Kings
+              </span>
+            </div>
+          </div>
+        </div>
         <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-4">
             {activeSection && (
@@ -979,13 +1014,41 @@ export default function StadiumLayout() {
           >
              <div className="w-full relative max-w-[1000px] bg-slate-50/50 rounded-[60px] p-8 md:p-16 border border-slate-100 shadow-2xl dark:border-emerald-500/10 dark:bg-[#0b1512]/85">
                <svg viewBox="0 0 1000 760" className="mx-auto h-auto w-full drop-shadow-2xl">
+                  <defs>
+                    <filter id="floodGlow" x="-200%" y="-200%" width="400%" height="400%">
+                      <feGaussianBlur stdDeviation="2.4" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                    <filter id="fieldSpill" x="-200%" y="-200%" width="400%" height="400%">
+                      <feGaussianBlur stdDeviation="10" />
+                    </filter>
+                    <radialGradient id="fieldGrass" cx="50%" cy="45%" r="65%">
+                      <stop offset="0%" stopColor="#58a85b" />
+                      <stop offset="100%" stopColor="#2f6f34" />
+                    </radialGradient>
+                    <linearGradient id="pitchBrown" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#c89b6a" />
+                      <stop offset="100%" stopColor="#a47446" />
+                    </linearGradient>
+                  </defs>
+
                   {/* Outer Stadium Body */}
                     <rect x="50" y="20" width="900" height="720" rx="60" className="fill-slate-50 stroke-slate-200 stroke-[2px] dark:fill-slate-900 dark:stroke-slate-700" />
                     <rect x="70" y="40" width="860" height="680" rx="50" className="fill-white stroke-slate-100 stroke-[1px] dark:fill-slate-950 dark:stroke-slate-800" />
+
+                  {/* Boundary Ring Between Field And Enclosures */}
+                  <g>
+                    <ellipse cx="500" cy="380" rx="232" ry="174" fill="#234a2f" opacity="0.55" />
+                    <ellipse cx="500" cy="380" rx="224" ry="167" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
+                    <ellipse cx="500" cy="380" rx="210" ry="155" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2" />
+                  </g>
                   
                   {/* Field Area with Grass Stripes */}
                   <g className="field">
-                    <ellipse cx="500" cy="380" rx="220" ry="165" className="fill-emerald-800/10 stroke-emerald-900/20 stroke-[4px] dark:fill-emerald-500/10 dark:stroke-emerald-400/20" />
+                    <ellipse cx="500" cy="380" rx="220" ry="165" fill="url(#fieldGrass)" stroke="#1f4929" strokeWidth="4" />
                     <mask id="fieldMask">
                       <ellipse cx="500" cy="380" rx="200" ry="145" fill="white" />
                     </mask>
@@ -997,14 +1060,98 @@ export default function StadiumLayout() {
                           y="0"
                           width={1000 / 30}
                           height="1000"
-                          className="fill-emerald-600/5"
+                          fill={i % 2 === 0 ? "#4d954f" : "#3d8342"}
+                          opacity="0.5"
                         />
                       ))}
+
+                      {/* Floodlight spill on grass for realistic overglow */}
+                      {SECTION_CONFIGS.map((section) => {
+                        const midAngle = getSegmentMidAngle(section.start, section.end);
+                        const angle = ((midAngle - 90) * Math.PI) / 180;
+                        const glowX = 500 + Math.cos(angle) * 165;
+                        const glowY = 380 + Math.sin(angle) * 124;
+
+                        return (
+                          <ellipse
+                            key={`field-spill-${section.id}`}
+                            cx={glowX}
+                            cy={glowY}
+                            rx="56"
+                            ry="26"
+                            transform={`rotate(${midAngle.toFixed(2)} ${glowX.toFixed(2)} ${glowY.toFixed(2)})`}
+                            className="fill-lime-100/8 opacity-35 dark:fill-amber-100/35 dark:opacity-80"
+                            filter="url(#fieldSpill)"
+                          />
+                        );
+                      })}
+
+                      {/* Minute turf stains and worn patches */}
+                      {[
+                        { cx: 430, cy: 320, rx: 14, ry: 7, rot: -22, fill: "#2f5f34", op: 0.18 },
+                        { cx: 555, cy: 338, rx: 11, ry: 5, rot: 14, fill: "#244b2a", op: 0.16 },
+                        { cx: 468, cy: 402, rx: 16, ry: 8, rot: 28, fill: "#346a3a", op: 0.14 },
+                        { cx: 586, cy: 428, rx: 13, ry: 6, rot: -18, fill: "#2a562f", op: 0.16 },
+                        { cx: 392, cy: 416, rx: 10, ry: 4, rot: 8, fill: "#204424", op: 0.2 },
+                        { cx: 520, cy: 468, rx: 12, ry: 5, rot: -12, fill: "#3a6f3d", op: 0.12 },
+                        { cx: 612, cy: 370, rx: 15, ry: 6, rot: 33, fill: "#284f2d", op: 0.15 },
+                      ].map((patch, index) => (
+                        <ellipse
+                          key={`grass-patch-${index}`}
+                          cx={patch.cx}
+                          cy={patch.cy}
+                          rx={patch.rx}
+                          ry={patch.ry}
+                          fill={patch.fill}
+                          opacity={patch.op}
+                          transform={`rotate(${patch.rot} ${patch.cx} ${patch.cy})`}
+                        />
+                      ))}
+
+                      {[
+                        { x: 448, y: 286, w: 5, h: 2, o: 0.18 },
+                        { x: 526, y: 352, w: 4, h: 2, o: 0.14 },
+                        { x: 578, y: 454, w: 6, h: 2, o: 0.16 },
+                        { x: 406, y: 444, w: 5, h: 2, o: 0.15 },
+                        { x: 500, y: 334, w: 4, h: 2, o: 0.12 },
+                      ].map((speck, index) => (
+                        <rect
+                          key={`grass-speck-${index}`}
+                          x={speck.x}
+                          y={speck.y}
+                          width={speck.w}
+                          height={speck.h}
+                          rx="1"
+                          fill="#224929"
+                          opacity={speck.o}
+                        />
+                      ))}
+
+                      {/* Central Cricket Pitch */}
+                      <rect
+                        x="487"
+                        y="292"
+                        width="26"
+                        height="176"
+                        rx="5"
+                        fill="url(#pitchBrown)"
+                      />
+                      <rect
+                        x="491"
+                        y="300"
+                        width="18"
+                        height="160"
+                        rx="4"
+                        fill="#be8b57"
+                        opacity="0.85"
+                      />
+                      <line x1="484" y1="312" x2="516" y2="312" stroke="rgba(255,255,255,0.35)" />
+                      <line x1="484" y1="448" x2="516" y2="448" stroke="rgba(255,255,255,0.35)" />
                     </g>
                     {/* Inner Field Detail */}
-                    <ellipse cx="500" cy="380" rx="200" ry="145" className="fill-transparent stroke-white/40 stroke-[1px] stroke-dasharray-[10,5] dark:stroke-white/15" />
-                    <circle cx="500" cy="380" r="40" className="fill-transparent stroke-white/40 stroke-[1px] dark:stroke-white/15" />
-                    <line x1="500" y1="235" x2="500" y2="525" className="stroke-white/40 stroke-[1px] dark:stroke-white/15" />
+                    <ellipse cx="500" cy="380" rx="200" ry="145" className="fill-transparent stroke-white/35 stroke-[1px] stroke-dasharray-[10,5]" />
+                    <circle cx="500" cy="380" r="40" className="fill-transparent stroke-white/30 stroke-[1px]" />
+                    <line x1="500" y1="235" x2="500" y2="525" className="stroke-white/25 stroke-[1px]" />
                   </g>
                   
                   {/* Intersecting Section Lines */}
@@ -1016,7 +1163,7 @@ export default function StadiumLayout() {
                     <g key={section.id} onClick={() => setActiveSectionId(section.id)} className="group cursor-pointer">
                       <path 
                         d={getRingSegmentPath(500, 380, 420, 310, 240, 185, section.start, section.end)} 
-                        className={`${section.fillClass} ${section.hoverClass} stroke-white stroke-[8px] transition-all duration-300 drop-shadow-sm dark:stroke-slate-950`} 
+                        className={`${section.fillClass} ${section.hoverClass} stroke-slate-900/40 stroke-[6px] transition-all duration-300 drop-shadow-sm dark:stroke-slate-950`} 
                       />
                       <g className="pointer-events-none">
                         <text
@@ -1032,13 +1179,62 @@ export default function StadiumLayout() {
                           ).toFixed(4)}
                           textAnchor="middle"
                           alignmentBaseline="middle"
-                          className="fill-slate-500 text-[16px] font-black uppercase tracking-widest group-hover:fill-emerald-800 transition-colors dark:fill-slate-400 dark:group-hover:fill-emerald-300"
+                          className="fill-slate-200 text-[16px] font-black uppercase tracking-[0.08em] group-hover:fill-emerald-100 transition-colors dark:fill-slate-200 dark:group-hover:fill-emerald-100"
                         >
                           {section.shortName}
                         </text>
                       </g>
                     </g>
                   ))}
+
+                  {/* Segment Floodlights (rendered above section borders) */}
+                  {SECTION_CONFIGS.map((section) => {
+                    const midAngle = getSegmentMidAngle(section.start, section.end);
+                    const angle = ((midAngle - 90) * Math.PI) / 180;
+                    const baseX = 500 + Math.cos(angle) * 226;
+                    const baseY = 380 + Math.sin(angle) * 170;
+                    const headX = 500 + Math.cos(angle) * 244;
+                    const headY = 380 + Math.sin(angle) * 183;
+
+                    return (
+                      <g key={`light-${section.id}`} className="pointer-events-none">
+                        <line
+                          x1={baseX}
+                          y1={baseY}
+                          x2={headX}
+                          y2={headY}
+                          className="stroke-slate-700 dark:stroke-slate-200/80"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                        />
+                        <circle cx={baseX} cy={baseY} r="2.4" className="fill-slate-700 dark:fill-slate-300/80" />
+
+                        <g transform={`translate(${headX.toFixed(2)} ${headY.toFixed(2)}) rotate(${(midAngle + 90).toFixed(2)})`}>
+                          <rect x="-11" y="-7.5" width="22" height="15" rx="2.2" className="fill-slate-700/95 dark:fill-slate-800/95" />
+                          {[-6.5, 0, 6.5].map((col) =>
+                            [-4, 0, 4].map((row) => (
+                              <circle
+                                key={`${section.id}-${col}-${row}`}
+                                cx={col}
+                                cy={row}
+                                r="1.2"
+                                className="fill-slate-300 dark:fill-amber-100"
+                              />
+                            )),
+                          )}
+                        </g>
+
+                        <ellipse
+                          cx={headX}
+                          cy={headY}
+                          rx="11"
+                          ry="7"
+                          className="fill-amber-200/75 opacity-0 dark:opacity-75"
+                          filter="url(#floodGlow)"
+                        />
+                      </g>
+                    );
+                  })}
                </svg>
              </div>
           </motion.div>

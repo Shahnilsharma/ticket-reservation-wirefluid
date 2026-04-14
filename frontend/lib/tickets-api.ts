@@ -1,4 +1,5 @@
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:4000';
+const REQUEST_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_BACKEND_TIMEOUT_MS ?? '12000');
 
 type RequestOptions = {
   method?: 'GET' | 'POST';
@@ -6,18 +7,48 @@ type RequestOptions = {
 };
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers: { 'content-type': 'application/json' },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload?.error ?? 'Request failed');
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+      method: options.method ?? 'GET',
+      headers: { 'content-type': 'application/json' },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+    const reason = isTimeout
+      ? `Request timed out after ${REQUEST_TIMEOUT_MS}ms`
+      : `Failed to reach backend at ${BACKEND_BASE_URL}`;
+    throw new Error(`${reason}. Ensure backend is running and NEXT_PUBLIC_BACKEND_URL is correct.`);
   }
 
-  return payload as T;
+  clearTimeout(timeout);
+
+  let payload: unknown = null;
+  const rawBody = await response.text();
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = { error: rawBody };
+    }
+  }
+
+  if (!response.ok) {
+    const errorMessage =
+      typeof payload === 'object' && payload !== null && 'error' in payload
+        ? String((payload as { error?: unknown }).error)
+        : `Request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  return (payload ?? {}) as T;
 }
 
 export type ApiSeatStatus = 'available' | 'locked' | 'sold';

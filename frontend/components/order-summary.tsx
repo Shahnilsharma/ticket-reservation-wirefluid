@@ -4,6 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Ticket, TrendingUp } from 'lucide-react';
 import { useSelectedSeats } from '@/contexts/seat-context';
+import { formatEther } from 'viem';
 
 const NATIVE_TOKEN_SYMBOL = 'WIRE';
 
@@ -11,6 +12,7 @@ export function OrderSummary({
   selectedSeats,
   availableCount,
   prices,
+  paymentQuote,
   isBusy,
   onConfirm,
   onRemoveSeat,
@@ -18,17 +20,34 @@ export function OrderSummary({
   selectedSeats: any[];
   availableCount: number;
   prices: Record<number, bigint | undefined>;
+  paymentQuote?: {
+    seatPriceBySeatId: Record<string, bigint>;
+    seatTotalWei: bigint;
+    estimatedGasWei: bigint;
+    requiredTotalWei: bigint;
+  };
   isBusy: boolean;
   onConfirm: () => void;
   onRemoveSeat?: (seatId: string) => void | Promise<void>;
 }) {
   const { removeSeat } = useSelectedSeats();
-  
-  const displayTotalPrice = selectedSeats.reduce((acc, seat) => {
-    // Seat prices are stored in native-token units for display.
-    return acc + (seat.priceEth || 0);
-  }, 0);
+  const quote = paymentQuote ?? null;
+  const hasOnChainQuote = quote !== null;
 
+  const toWire = (value: bigint) => Number(formatEther(value));
+
+  const subtotalWire = hasOnChainQuote
+    ? toWire(quote.seatTotalWei)
+    : selectedSeats.reduce((acc, seat) => acc + (seat.priceEth || 0), 0);
+
+  const gasWire = hasOnChainQuote
+    ? toWire(quote.estimatedGasWei)
+    : 0.001;
+
+  const totalWire = hasOnChainQuote
+    ? toWire(quote.requiredTotalWei)
+    : subtotalWire + gasWire;
+  
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -78,7 +97,12 @@ export function OrderSummary({
                   <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                     Row {seat.rowLabel}, Seat {seat.number}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{seat.priceEth} {NATIVE_TOKEN_SYMBOL}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {(hasOnChainQuote && paymentQuote?.seatPriceBySeatId?.[seat.id] != null
+                      ? toWire(quote.seatPriceBySeatId[seat.id]).toFixed(4)
+                      : Number(seat.priceEth || 0).toFixed(4))}{' '}
+                    {NATIVE_TOKEN_SYMBOL}
+                  </p>
                 </div>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
@@ -123,17 +147,17 @@ export function OrderSummary({
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-600 dark:text-slate-400">Subtotal</span>
             <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {displayTotalPrice.toFixed(4)} {NATIVE_TOKEN_SYMBOL}
+              {subtotalWire.toFixed(4)} {NATIVE_TOKEN_SYMBOL}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-600 dark:text-slate-400">Gas Fee</span>
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">~0.0010 {NATIVE_TOKEN_SYMBOL}</span>
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">~{gasWire.toFixed(4)} {NATIVE_TOKEN_SYMBOL}</span>
           </div>
           <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-800">
             <span className="font-semibold text-slate-900 dark:text-slate-100">Total Price</span>
             <span className="text-lg font-bold bg-linear-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">
-              {(displayTotalPrice + 0.001).toFixed(4)} {NATIVE_TOKEN_SYMBOL}
+              {totalWire.toFixed(4)} {NATIVE_TOKEN_SYMBOL}
             </span>
           </div>
         </motion.div>

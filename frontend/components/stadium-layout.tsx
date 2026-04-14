@@ -46,7 +46,11 @@ import {
 } from "@/lib/evm-errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { STADIUM_CONTRACT } from "@/lib/contract-config";
+import {
+  ENABLE_METADATA_MINT,
+  STADIUM_CONTRACT,
+  STATIC_MINT_METADATA_URI,
+} from "@/lib/contract-config";
 import { usePublicClient } from "wagmi";
 import { formatEther, type Address } from "viem";
 import {
@@ -62,7 +66,7 @@ const TX_EXPLORER_BASE_URL =
 const WIREFLUID_FAUCET_URL =
   process.env.NEXT_PUBLIC_WIREFLUID_FAUCET_URL ??
   "https://faucet.wirefluid.com/";
-const DEFAULT_GAS_RESERVE_WEI =
+const FALLBACK_GAS_RESERVE_WEI =
   BigInt(process.env.NEXT_PUBLIC_MIN_GAS_RESERVE_WEI ?? "2000000000000000");
 
 type InjectedProvider = {
@@ -83,6 +87,27 @@ type SeatSocketPayload = {
   walletAddress?: string | null;
   lockedUntil?: string | null;
   status: "AVAILABLE" | "LOCKED" | "SOLD";
+};
+
+type ContractSeatStateRead =
+  | { price?: bigint; isReserved?: boolean }
+  | readonly unknown[];
+
+type ContractSeatReservation = {
+  seatId: string;
+  eventId: 1;
+  section: 1 | 2 | 3;
+  row: number;
+  seatNumber: number;
+};
+
+type OnChainPaymentQuote = {
+  chainSeatStates: ContractSeatStateRead[];
+  seatPricesWei: bigint[];
+  seatPriceBySeatId: Record<string, bigint>;
+  seatTotalWei: bigint;
+  estimatedGasWei: bigint;
+  requiredTotalWei: bigint;
 };
 
 const SECTION_CONFIGS: {
@@ -265,6 +290,12 @@ export default function StadiumLayout() {
   const [showFaucetModal, setShowFaucetModal] = useState(false);
   const [qrIssuedAt, setQrIssuedAt] = useState<number | null>(null);
   const [confirmedSeats, setConfirmedSeats] = useState<typeof selectedSeats>([]);
+  const [paymentQuote, setPaymentQuote] = useState<{
+    seatPriceBySeatId: Record<string, bigint>;
+    seatTotalWei: bigint;
+    estimatedGasWei: bigint;
+    requiredTotalWei: bigint;
+  } | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
@@ -297,6 +328,11 @@ export default function StadiumLayout() {
     [sections, activeSectionId],
   );
 
+  const activeSectionClientId = useMemo(
+    () => activeSection?.clientId ?? null,
+    [activeSection],
+  );
+
   const applySeatStatusUpdate = useCallback(
     (payload: SeatSocketPayload) => {
       setSectionSeats((prev) =>
@@ -318,6 +354,207 @@ export default function StadiumLayout() {
   const writes = useSeatWrites();
   const pricesQ = useBasePrices(1);
   const walletAddress = address ?? "";
+
+  const buildContractReservations = useCallback(
+    () =>
+      selectedSeats.map((seat): ContractSeatReservation => ({
+        seatId: seat.id,
+        eventId: 1,
+        section: getContractSectionId(seat.sectionId, seat.sectionName),
+        row: rowLabelToContractRow(seat.rowLabel),
+        seatNumber: seatNumberToContractSeat(seat.number),
+      })),
+    [selectedSeats],
+  );
+
+  const computeOnChainPaymentQuote = useCallback(
+    async (
+      reservations: ContractSeatReservation[],
+      account?: Address,
+    ): Promise<OnChainPaymentQuote> => {
+      if (!publicClient) {
+        throw new Error("Public client not available for on-chain quote.");
+      }
+
+      const chainSeatStates = (await Promise.all(
+        reservations.map((seat) =>
+          publicClient.readContract({
+            ...STADIUM_CONTRACT,
+            functionName: "getSeatByIndex",
+            args: [
+              BigInt(seat.eventId),
+              BigInt(seat.section),
+              BigInt(seat.row),
+              BigInt(seat.seatNumber),
+            ],
+          }),
+        ),
+      )) as ContractSeatStateRead[];
+
+      const seatPricesWei = await Promise.all(
+        reservations.map((seat, index) => {
+          const seatState = chainSeatStates[index];
+
+          const seatPrice =
+            typeof seatState === "object" && seatState !== null && "price" in seatState
+              ? BigInt((seatState as { price: bigint }).price)
+              : BigInt((seatState as readonly unknown[])[4] as bigint);
+
+          if (seatPrice > BigInt(0)) {
+            return Promise.resolve(seatPrice);
+          }
+
+          return publicClient.readContract({
+            ...STADIUM_CONTRACT,
+            functionName: "basePrices",
+            args: [BigInt(seat.eventId), BigInt(seat.section)],
+          });
+        }),
+      );
+
+      const seatPriceBySeatId = reservations.reduce<Record<string, bigint>>(
+        (acc, seat, index) => {
+          acc[seat.seatId] = BigInt(seatPricesWei[index] as bigint);
+          return acc;
+        },
+        {},
+      );
+
+      const seatTotalWei = seatPricesWei.reduce(
+        (acc, price) => acc + BigInt(price as bigint),
+        BigInt(0),
+      );
+
+      let estimatedGasWei = FALLBACK_GAS_RESERVE_WEI;
+
+      if (account) {
+        try {
+          const estimatedGasLimit =
+            reservations.length === 1
+              ? await publicClient.estimateContractGas(
+                  ENABLE_METADATA_MINT
+                    ? {
+                        ...STADIUM_CONTRACT,
+                        account,
+                        functionName: "reserveSeat",
+                        args: [
+                          BigInt(reservations[0].eventId),
+                          BigInt(reservations[0].section),
+                          BigInt(reservations[0].row),
+                          BigInt(reservations[0].seatNumber),
+                          STATIC_MINT_METADATA_URI,
+                        ],
+                        value: seatTotalWei,
+                      }
+                    : {
+                        ...STADIUM_CONTRACT,
+                        account,
+                        functionName: "reserveSeat",
+                        args: [
+                          BigInt(reservations[0].eventId),
+                          BigInt(reservations[0].section),
+                          BigInt(reservations[0].row),
+                          BigInt(reservations[0].seatNumber),
+                        ],
+                        value: seatTotalWei,
+                      },
+                )
+              : await publicClient.estimateContractGas(
+                  ENABLE_METADATA_MINT
+                    ? {
+                        ...STADIUM_CONTRACT,
+                        account,
+                        functionName: "reserveSeatsBatch",
+                        args: [
+                          reservations.map((seat) => ({
+                            eventId: BigInt(seat.eventId),
+                            section: BigInt(seat.section),
+                            row: BigInt(seat.row),
+                            seatNumber: BigInt(seat.seatNumber),
+                          })),
+                          Array.from({ length: reservations.length }, () => STATIC_MINT_METADATA_URI),
+                        ],
+                        value: seatTotalWei,
+                      }
+                    : {
+                        ...STADIUM_CONTRACT,
+                        account,
+                        functionName: "reserveSeatsBatch",
+                        args: [
+                          reservations.map((seat) => ({
+                            eventId: BigInt(seat.eventId),
+                            section: BigInt(seat.section),
+                            row: BigInt(seat.row),
+                            seatNumber: BigInt(seat.seatNumber),
+                          })),
+                        ],
+                        value: seatTotalWei,
+                      },
+                );
+
+          const gasPrice = await publicClient.getGasPrice();
+          const gasLimitWithSafetyMargin = (estimatedGasLimit * BigInt(120)) / BigInt(100);
+          estimatedGasWei = gasLimitWithSafetyMargin * gasPrice;
+        } catch (estimateError) {
+          console.warn("Failed to estimate gas, using fallback reserve:", estimateError);
+        }
+      }
+
+      return {
+        chainSeatStates,
+        seatPricesWei: seatPricesWei.map((price) => BigInt(price as bigint)),
+        seatPriceBySeatId,
+        seatTotalWei,
+        estimatedGasWei,
+        requiredTotalWei: seatTotalWei + estimatedGasWei,
+      };
+    },
+    [publicClient],
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!publicClient || selectedSeats.length === 0) {
+      setPaymentQuote(null);
+      return;
+    }
+
+    const loadPaymentQuote = async () => {
+      try {
+        const reservations = buildContractReservations();
+        const quote = await computeOnChainPaymentQuote(
+          reservations,
+          walletAddress ? (walletAddress as Address) : undefined,
+        );
+
+        if (isCancelled) return;
+
+        setPaymentQuote({
+          seatPriceBySeatId: quote.seatPriceBySeatId,
+          seatTotalWei: quote.seatTotalWei,
+          estimatedGasWei: quote.estimatedGasWei,
+          requiredTotalWei: quote.requiredTotalWei,
+        });
+      } catch (error) {
+        if (isCancelled) return;
+        console.error("Failed to compute payment quote:", error);
+        setPaymentQuote(null);
+      }
+    };
+
+    void loadPaymentQuote();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    buildContractReservations,
+    computeOnChainPaymentQuote,
+    publicClient,
+    selectedSeats.length,
+    walletAddress,
+  ]);
 
   const setManualNetworkInstructions = useCallback(
     (reason?: string) => {
@@ -407,26 +644,27 @@ export default function StadiumLayout() {
   }, [refreshSections]);
 
   useEffect(() => {
-    if (activeSectionId) {
+    if (activeSectionClientId) {
       const loadSeats = async () => {
         setLoadingSectionSeats(true);
         try {
-          const section = sections.find(
-            (s) => s.id === activeSectionId || s.clientId === activeSectionId,
-          );
-          if (section) {
-            const response = await fetchSectionSeats(section.clientId);
-            setSectionSeats(response.seats);
-          }
+          const response = await fetchSectionSeats(activeSectionClientId);
+          setSectionSeats(response.seats);
         } catch (err) {
-          console.error(err);
+          console.error("Failed to load section seats:", err);
+          setSectionSeats([]);
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Unable to load seats right now. Please try again.";
+          toast.error(message, { id: "section-seat-load-error" });
         } finally {
           setLoadingSectionSeats(false);
         }
       };
       void loadSeats();
     }
-  }, [activeSectionId, sections]);
+  }, [activeSectionClientId]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -440,7 +678,6 @@ export default function StadiumLayout() {
     const handleSeatLocked = (payload: SeatSocketPayload) => {
       if (payload.sectionId !== currentSectionId) return;
       applySeatStatusUpdate(payload);
-      void refreshSections();
     };
 
     const handleSeatUnlocked = (payload: SeatSocketPayload) => {
@@ -453,7 +690,6 @@ export default function StadiumLayout() {
       ) {
         removeSeat(payload.seatId);
       }
-      void refreshSections();
     };
 
     const handleSeatSold = (payload: SeatSocketPayload) => {
@@ -462,7 +698,6 @@ export default function StadiumLayout() {
       if (selectedSeatIdSet.has(payload.seatId)) {
         removeSeat(payload.seatId);
       }
-      void refreshSections();
     };
 
     socket.on("section.seat.locked", handleSeatLocked);
@@ -480,7 +715,6 @@ export default function StadiumLayout() {
   }, [
     activeSection?.id,
     applySeatStatusUpdate,
-    refreshSections,
     removeSeat,
     selectedSeatIdSet,
     walletAddress,
@@ -512,14 +746,9 @@ export default function StadiumLayout() {
           });
           clearCart();
           await refreshSections();
-          if (activeSectionId) {
-            const section = sections.find(
-              (s) => s.id === activeSectionId || s.clientId === activeSectionId,
-            );
-            if (section) {
-              const response = await fetchSectionSeats(section.clientId);
-              setSectionSeats(response.seats);
-            }
+          if (activeSectionClientId) {
+            const response = await fetchSectionSeats(activeSectionClientId);
+            setSectionSeats(response.seats);
           }
         } catch (error) {
           toast.error("Sync failed. Check bookings.", { id: processingToast });
@@ -534,9 +763,8 @@ export default function StadiumLayout() {
     selectedSeats,
     clearCart,
     refreshSections,
-    activeSectionId,
+    activeSectionClientId,
     lastProcessedHash,
-    sections,
   ]);
 
   const unlockSeatAndRemove = useCallback(
@@ -560,13 +788,12 @@ export default function StadiumLayout() {
               : seat,
           ),
         );
-        void refreshSections();
       } catch (err) {
         console.error("Failed to unlock seat:", err);
         toast.error("Failed to unlock seat. Please try again.");
       }
     },
-    [walletAddress, removeSeat, refreshSections],
+    [walletAddress, removeSeat],
   );
 
   const handleSeatClick = async (seat: any) => {
@@ -610,7 +837,6 @@ export default function StadiumLayout() {
           sectionId: activeSection?.id ?? "",
           sectionName: activeSection?.name ?? "",
         });
-        void refreshSections();
       } catch (err) {
         toast.error("Seat is already locked or unavailable");
       }
@@ -656,53 +882,17 @@ export default function StadiumLayout() {
         return;
       }
 
-      const contractSeats = selectedSeats.map((seat) => ({
-        section: getContractSectionId(seat.sectionId, seat.sectionName),
-        row: rowLabelToContractRow(seat.rowLabel),
-        seatNumber: seatNumberToContractSeat(seat.number),
-      }));
+      const contractSeats = buildContractReservations();
 
-      const chainSeatStates = publicClient
-        ? await Promise.all(
-            contractSeats.map((seat) =>
-              publicClient.readContract({
-                ...STADIUM_CONTRACT,
-                functionName: "getSeatByIndex",
-                args: [
-                  BigInt(1),
-                  BigInt(seat.section),
-                  BigInt(seat.row),
-                  BigInt(seat.seatNumber),
-                ],
-              }),
-            ),
+      const quote = publicClient
+        ? await computeOnChainPaymentQuote(
+            contractSeats,
+            walletAddress ? (walletAddress as Address) : undefined,
           )
-        : [];
+        : null;
 
-      const onChainPrices = publicClient
-        ? await Promise.all(
-            contractSeats.map((seat, index) => {
-              const seatState = chainSeatStates[index] as
-                | { price?: bigint; isReserved?: boolean }
-                | readonly unknown[];
-
-              const seatPrice =
-                typeof seatState === "object" && seatState !== null && "price" in seatState
-                  ? BigInt((seatState as { price: bigint }).price)
-                  : BigInt((seatState as readonly unknown[])[4] as bigint);
-
-              if (seatPrice > BigInt(0)) {
-                return Promise.resolve(seatPrice);
-              }
-
-              return publicClient.readContract({
-                ...STADIUM_CONTRACT,
-                functionName: "basePrices",
-                args: [BigInt(1), BigInt(seat.section)],
-              });
-            }),
-          )
-        : [];
+      const chainSeatStates = quote?.chainSeatStates ?? [];
+      const onChainPrices = quote?.seatPricesWei ?? [];
 
       if (publicClient) {
         const reservedSeat = chainSeatStates.map((seatState) => {
@@ -713,7 +903,34 @@ export default function StadiumLayout() {
         });
 
         if (reservedSeat.some(Boolean)) {
-          toast.error("One or more selected seats are already reserved on-chain. Pick a different seat.");
+          const reservedSeatIds = contractSeats
+            .filter((_, index) => reservedSeat[index])
+            .map((seat) => seat.seatId);
+
+          if (reservedSeatIds.length > 0) {
+            setSectionSeats((prev) =>
+              prev.map((seat) =>
+                reservedSeatIds.includes(seat.id)
+                  ? {
+                      ...seat,
+                      status: "sold",
+                      walletAddress: null,
+                      lockedUntil: null,
+                    }
+                  : seat,
+              ),
+            );
+
+            reservedSeatIds.forEach((seatId) => {
+              if (selectedSeatIdSet.has(seatId)) {
+                removeSeat(seatId);
+              }
+            });
+
+            await refreshSections();
+          }
+
+          toast.error("Some selected seats were already reserved on-chain. They were removed from your cart.");
           return;
         }
 
@@ -723,45 +940,54 @@ export default function StadiumLayout() {
         }
       }
 
-      const totalValue = onChainPrices.reduce(
-        (acc, price) => acc + BigInt(price as bigint),
-        BigInt(0),
-      );
+      const fallbackTotalValue = selectedSeats.reduce((acc, seat) => {
+        const seatPriceEth = Number(seat.priceEth ?? 0);
+        return acc + BigInt(Math.max(Math.round(seatPriceEth * 1e18), 0));
+      }, BigInt(0));
+
+      const totalValue = quote?.seatTotalWei ?? fallbackTotalValue;
+
+      const params = contractSeats.map((seat) => ({
+        eventId: seat.eventId,
+        section: seat.section,
+        row: seat.row,
+        seatNumber: seat.seatNumber,
+      }));
 
       if (publicClient && walletAddress) {
+        const estimatedGasCostWei = quote?.estimatedGasWei ?? FALLBACK_GAS_RESERVE_WEI;
+
         const latestBalance = await publicClient.getBalance({
           address: walletAddress as Address,
         });
 
-        const requiredValue = totalValue + DEFAULT_GAS_RESERVE_WEI;
+        const requiredValue = quote?.requiredTotalWei ?? (totalValue + estimatedGasCostWei);
         if (latestBalance < requiredValue) {
           const availableWire = Number(formatEther(latestBalance)).toFixed(6);
+          const seatsWire = Number(formatEther(totalValue)).toFixed(6);
+          const estimatedGasWire = Number(formatEther(estimatedGasCostWei)).toFixed(6);
           const requiredWire = Number(formatEther(requiredValue)).toFixed(6);
           setTxError(
-            `Insufficient WIRE balance. Available: ${availableWire} WIRE. Required (seat + gas buffer): ${requiredWire} WIRE. Claim from faucet and retry.`,
+            `Insufficient WIRE balance. Available: ${availableWire} WIRE. Seats: ${seatsWire} WIRE. Estimated gas: ${estimatedGasWire} WIRE. Required total: ${requiredWire} WIRE. Claim from faucet and retry.`,
           );
           setShowFaucetModal(true);
           return;
         }
       } else if (walletBalanceData?.value != null) {
-        const requiredValue = totalValue + DEFAULT_GAS_RESERVE_WEI;
+        const estimatedGasWei = quote?.estimatedGasWei ?? FALLBACK_GAS_RESERVE_WEI;
+        const requiredValue = quote?.requiredTotalWei ?? (totalValue + estimatedGasWei);
         if (walletBalanceData.value < requiredValue) {
           const availableWire = Number(formatEther(walletBalanceData.value)).toFixed(6);
+          const seatsWire = Number(formatEther(totalValue)).toFixed(6);
+          const estimatedGasWire = Number(formatEther(estimatedGasWei)).toFixed(6);
           const requiredWire = Number(formatEther(requiredValue)).toFixed(6);
           setTxError(
-            `Insufficient WIRE balance. Available: ${availableWire} WIRE. Required (seat + gas buffer): ${requiredWire} WIRE. Claim from faucet and retry.`,
+            `Insufficient WIRE balance. Available: ${availableWire} WIRE. Seats: ${seatsWire} WIRE. Estimated gas: ${estimatedGasWire} WIRE. Required total: ${requiredWire} WIRE. Claim from faucet and retry.`,
           );
           setShowFaucetModal(true);
           return;
         }
       }
-
-      const params = contractSeats.map((seat) => ({
-        eventId: 1,
-        section: seat.section,
-        row: seat.row,
-        seatNumber: seat.seatNumber,
-      }));
 
       if (selectedSeats.length === 1)
         await writes.reserveSingle(params[0], totalValue);
@@ -995,6 +1221,7 @@ export default function StadiumLayout() {
                 selectedSeats={selectedSeats}
                 availableCount={dashboardCounts.available}
                 prices={pricesQ.prices}
+                paymentQuote={paymentQuote ?? undefined}
                 isBusy={writes.isWriting || writes.receiptQuery.isLoading}
                 onConfirm={confirmPurchase}
                 onRemoveSeat={unlockSeatAndRemove}
